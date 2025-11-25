@@ -4,6 +4,7 @@ export class Database {
   private static instance: Database;
   private db: any;
   private dbName = 'dreamtraders.db';
+  private isConnected = false;
 
   private constructor() {}
 
@@ -15,11 +16,18 @@ export class Database {
   }
 
   public connect(): void {
+    // Prevent multiple connections
+    if (this.isConnected) {
+      console.log('Database already connected, skipping initialization');
+      return;
+    }
+
     try {
       console.log('Opening database:', this.dbName);
       this.db = open({ name: this.dbName });
       console.log('Database opened, initializing tables...');
       this.initializeTables();
+      this.isConnected = true;
       console.log('Database initialization complete!');
     } catch (error) {
       console.error('Database connection failed:', error);
@@ -262,7 +270,12 @@ export class Database {
         [migration1],
       );
 
-      if (!hasMigration1.rows || hasMigration1.rows.length === 0) {
+      // Check both possible result structures
+      const migration1Exists = 
+        (hasMigration1.rows?.length > 0) || 
+        (hasMigration1.rows?._array?.length > 0);
+
+      if (!migration1Exists) {
         console.log('Running migration: ' + migration1);
 
         // Check if column already exists
@@ -276,7 +289,7 @@ export class Database {
         }
 
         this.execute(
-          'INSERT INTO migrations (name, executed_at) VALUES (?, ?)',
+          'INSERT OR IGNORE INTO migrations (name, executed_at) VALUES (?, ?)',
           [migration1, Date.now()],
         );
         console.log('Migration completed: ' + migration1);
@@ -289,7 +302,12 @@ export class Database {
         [migration2],
       );
 
-      if (!hasMigration2.rows || hasMigration2.rows.length === 0) {
+      // Check both possible result structures
+      const migration2Exists = 
+        (hasMigration2.rows?.length > 0) || 
+        (hasMigration2.rows?._array?.length > 0);
+
+      if (!migration2Exists) {
         console.log('Running migration: ' + migration2);
 
         const tableInfo = this.execute('PRAGMA table_info(clients)');
@@ -310,7 +328,7 @@ export class Database {
         }
 
         this.execute(
-          'INSERT INTO migrations (name, executed_at) VALUES (?, ?)',
+          'INSERT OR IGNORE INTO migrations (name, executed_at) VALUES (?, ?)',
           [migration2, Date.now()],
         );
         console.log('Migration completed: ' + migration2);
@@ -414,7 +432,41 @@ export class Database {
   public async close(): Promise<void> {
     if (this.db) {
       await this.db.close();
+      this.isConnected = false;
       console.log('Database closed');
+    }
+  }
+
+  public resetDatabase(): void {
+    console.log('Resetting database...');
+    try {
+      // Drop all tables
+      const tables = [
+        'custom_menus',
+        'expenses',
+        'expense_categories',
+        'invoice_items',
+        'invoices',
+        'ledger_items',
+        'ledger_entries',
+        'clients',
+        'stock_movements',
+        'stock_items',
+        'categories',
+        'settings',
+        'migrations',
+      ];
+
+      for (const table of tables) {
+        this.execute(`DROP TABLE IF EXISTS ${table}`);
+      }
+
+      console.log('All tables dropped, reinitializing...');
+      this.initializeTables();
+      console.log('Database reset complete!');
+    } catch (error) {
+      console.error('Failed to reset database:', error);
+      throw error;
     }
   }
 }
