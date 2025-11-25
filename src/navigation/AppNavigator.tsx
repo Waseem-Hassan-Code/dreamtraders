@@ -82,6 +82,16 @@ function TabNavigator() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="cog" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -106,7 +116,6 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
         <Stack.Screen name="Reports" component={ReportsScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="ClientDetails" component={ClientDetailsScreen} />
         <Stack.Screen name="CreateInvoice" component={InvoiceCreateScreen} />
       </Stack.Navigator>
