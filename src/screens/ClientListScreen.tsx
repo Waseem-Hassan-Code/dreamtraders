@@ -16,6 +16,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { useClientStore } from '@/store/clientStore';
 import { Client } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { showSuccessToast } from '@/utils/toast';
 
 export default function ClientListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -70,10 +71,7 @@ export default function ClientListScreen({ navigation }: any) {
           ...formData,
           dob: formData.dob,
         });
-        Alert.alert(
-          'Success',
-          `${formData.name} has been updated successfully`,
-        );
+        showSuccessToast('Client Updated', `${formData.name} has been updated successfully`);
       } else {
         await createClient({
           ...formData,
@@ -81,7 +79,7 @@ export default function ClientListScreen({ navigation }: any) {
           balance: 0,
           totalBusinessValue: 0,
         });
-        Alert.alert('Success', `${formData.name} has been added successfully`);
+        showSuccessToast('Client Added', `${formData.name} has been added successfully`);
       }
       resetForm();
       setShowAddModal(false);

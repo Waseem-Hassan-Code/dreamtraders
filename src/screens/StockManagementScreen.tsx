@@ -17,6 +17,7 @@ import { useStockStore } from '@/store/stockStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { StockItem, CategorySettings } from '@/types';
 import { generateId } from '@/utils/idGenerator';
+import { showSuccessToast } from '@/utils/toast';
 
 export default function StockManagementScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -93,15 +94,12 @@ export default function StockManagementScreen({ navigation }: any) {
 
       if (editingItem) {
         await updateStockItem(stockItem.id, stockItem);
-        Alert.alert(
-          'Success',
-          `${formData.name} has been updated successfully`,
-        );
+        showSuccessToast('Stock Updated', `${formData.name} has been updated successfully`);
       } else {
         await createStockItem(stockItem);
-        Alert.alert(
-          'Success',
-          `${formData.name} (${formData.currentQuantity} ${formData.unit}) added successfully`,
+        showSuccessToast(
+          'Stock Added',
+          `${formData.name} (${formData.currentQuantity} ${formData.unit}) added successfully`
         );
       }
 

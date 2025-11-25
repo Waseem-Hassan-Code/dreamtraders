@@ -7,8 +7,10 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Toast from 'react-native-toast-message';
 import AppNavigator from './src/navigation/AppNavigator';
 import database from './src/database';
+import SplashScreen from './src/components/SplashScreen';
 
 function App() {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -43,12 +45,7 @@ function App() {
   }
 
   if (!isDbReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Dream Traders ERP</Text>
-        <Text style={styles.debugText}>{debugInfo}</Text>
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return (
@@ -57,6 +54,7 @@ function App() {
         <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
         <AppNavigator />
       </SafeAreaProvider>
+      <Toast />
     </GestureHandlerRootView>
   );
 }

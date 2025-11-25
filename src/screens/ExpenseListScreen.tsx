@@ -16,6 +16,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { useExpenseStore } from '../store/expenseStore';
 import { Expense, ExpenseCategory } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { showSuccessToast } from '@/utils/toast';
 
 export default function ExpenseListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -63,7 +64,7 @@ export default function ExpenseListScreen({ navigation }: any) {
         notes: formData.notes,
       });
       
-      Alert.alert('Success', 'Expense added successfully');
+      showSuccessToast('Expense Added', 'Expense added successfully');
       setShowAddModal(false);
       resetForm();
     } catch (error: any) {

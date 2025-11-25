@@ -263,7 +263,7 @@ export class Database {
         )
       `);
 
-      // Migration 1: Add deleted_at to stock_items
+      // Migration 1: Add deleted_at to stock_items (if not exists)
       const migration1 = 'add_deleted_at_to_stock_items';
       const hasMigration1 = this.execute(
         'SELECT * FROM migrations WHERE name = ?',
@@ -295,45 +295,6 @@ export class Database {
         console.log('Migration completed: ' + migration1);
       }
 
-      // Migration 2: Add new fields to clients table
-      const migration2 = 'add_fields_to_clients';
-      const hasMigration2 = this.execute(
-        'SELECT * FROM migrations WHERE name = ?',
-        [migration2],
-      );
-
-      // Check both possible result structures
-      const migration2Exists = 
-        (hasMigration2.rows?.length > 0) || 
-        (hasMigration2.rows?._array?.length > 0);
-
-      if (!migration2Exists) {
-        console.log('Running migration: ' + migration2);
-
-        const tableInfo = this.execute('PRAGMA table_info(clients)');
-        const columns =
-          tableInfo.rows?._array?.map((col: any) => col.name) || [];
-
-        if (!columns.includes('whatsapp')) {
-          this.execute('ALTER TABLE clients ADD COLUMN whatsapp TEXT');
-        }
-        if (!columns.includes('email')) {
-          this.execute('ALTER TABLE clients ADD COLUMN email TEXT');
-        }
-        if (!columns.includes('dob')) {
-          this.execute('ALTER TABLE clients ADD COLUMN dob INTEGER');
-        }
-        if (!columns.includes('deleted_at')) {
-          this.execute('ALTER TABLE clients ADD COLUMN deleted_at INTEGER');
-        }
-
-        this.execute(
-          'INSERT OR IGNORE INTO migrations (name, executed_at) VALUES (?, ?)',
-          [migration2, Date.now()],
-        );
-        console.log('Migration completed: ' + migration2);
-      }
-
       console.log('All migrations completed successfully');
     } catch (error) {
       console.error('Migration failed:', error);
@@ -346,10 +307,14 @@ export class Database {
       console.log('Seeding default data...');
       // Check if settings exist
       const settings = this.execute('SELECT * FROM settings LIMIT 1');
-      if (!settings.rows || settings.rows.length === 0) {
-        // Insert default settings
+      const hasSettings = 
+        (settings.rows?.length > 0) || 
+        (settings.rows?._array?.length > 0);
+        
+      if (!hasSettings) {
+        // Insert default settings with OR IGNORE to prevent duplicates
         this.execute(
-          `INSERT INTO settings (id, business_name, owner_name, phone, currency, date_format, 
+          `INSERT OR IGNORE INTO settings (id, business_name, owner_name, phone, currency, date_format, 
            dark_mode, whatsapp_enabled, backup_enabled, updated_at) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
@@ -407,11 +372,32 @@ export class Database {
       if (!this.db) {
         throw new Error('Database not connected');
       }
+      console.log('Executing SQL:', sql.substring(0, 100), params ? `with ${params.length} params` : '');
+      
       // op-sqlite execute is synchronous
-      return this.db.execute(sql, params);
+      const result = this.db.execute(sql, params);
+      
+      // Ensure result has a consistent structure
+      if (!result) {
+        return { rows: { _array: [], length: 0 } };
+      }
+      
+      // If result.rows is undefined, initialize it
+      if (!result.rows) {
+        result.rows = { _array: [], length: 0 };
+      }
+      
+      // Ensure _array exists
+      if (!result.rows._array) {
+        result.rows._array = [];
+      }
+      
+      console.log('SQL result rows:', result.rows._array?.length || 0);
+      return result;
     } catch (error) {
       console.error('SQL execution error:', error);
       console.error('SQL:', sql);
+      console.error('Params:', params);
       throw error;
     }
   }

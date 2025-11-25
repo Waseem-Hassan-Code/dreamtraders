@@ -11,12 +11,14 @@ import {
   FlatList,
   StatusBar,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemeStore } from '@/store/themeStore';
 import { useClientStore } from '@/store/clientStore';
 import { useStockStore } from '@/store/stockStore';
 import { useInvoiceStore } from '@/store/invoiceStore';
 import { Client, StockItem, SaleItem } from '@/types';
+import { showSuccessToast } from '@/utils/toast';
 
 export default function InvoiceCreateScreen({ navigation, route }: any) {
   const { theme, isDark } = useThemeStore();
@@ -39,17 +41,20 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
   const [amountPaid, setAmountPaid] = useState('');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    loadClients();
-    loadStockItems('all');
-    loadInvoiceNumber();
-    
-    // Pre-select client if passed from Client Details
-    if (route.params?.clientId) {
-      const client = clients.find(c => c.id === route.params.clientId);
-      if (client) setSelectedClient(client);
-    }
-  }, []);
+  // Reload clients and stock whenever screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadClients();
+      loadStockItems('all');
+      loadInvoiceNumber();
+      
+      // Pre-select client if passed from Client Details
+      if (route.params?.clientId) {
+        const client = clients.find(c => c.id === route.params.clientId);
+        if (client) setSelectedClient(client);
+      }
+    }, [route.params?.clientId])
+  );
 
   const loadInvoiceNumber = async () => {
     const num = await generateInvoiceNumber();
@@ -132,9 +137,8 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
         notes,
       });
 
-      Alert.alert('Success', 'Invoice created successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      showSuccessToast('Invoice Created', `Invoice #${invoiceNumber} created successfully`);
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to create invoice');
     }

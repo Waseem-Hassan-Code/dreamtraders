@@ -8,6 +8,7 @@ import {
   Dimensions,
   StatusBar,
   Switch,
+  Image,
 } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -146,13 +147,20 @@ export default function DashboardScreen({ navigation }: any) {
           { backgroundColor: theme.surface, borderBottomColor: theme.border },
         ]}
       >
-        <View>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
-            Dream Traders
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textTertiary }]}>
-            Welcome back! 👋
-          </Text>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('@/assets/images/AppLogo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>
+              Dream Traders
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.textTertiary }]}>
+              Welcome back! 👋
+            </Text>
+          </View>
         </View>
         <View style={styles.headerRight}>
           <Icon
@@ -398,6 +406,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
   },
   headerTitle: {
     fontSize: 24,

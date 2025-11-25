@@ -17,14 +17,14 @@ import { useThemeStore } from '@/store/themeStore';
 import { useClientStore } from '@/store/clientStore';
 import { Client, LedgerEntry } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { showSuccessToast } from '@/utils/toast';
 
 export default function ClientDetailsScreen({ route, navigation }: any) {
   const { clientId } = route.params;
   const { theme, isDark } = useThemeStore();
-  const { clients, getClientLedger, addLedgerEntry } = useClientStore();
+  const { clients, ledgerEntries, loadLedger, addLedgerEntry, loadClients } = useClientStore();
 
   const [client, setClient] = useState<Client | undefined>(undefined);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -47,8 +47,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
 
     if (foundClient) {
       try {
-        const history = await getClientLedger(clientId);
-        setLedger(history);
+        await loadLedger(clientId);
       } catch (error) {
         console.error('Failed to load ledger:', error);
       }
@@ -83,7 +82,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         items: [],
       });
       
-      Alert.alert('Success', 'Payment recorded successfully');
+      showSuccessToast('Payment Recorded', `Payment of PKR ${parseFloat(paymentData.amount).toLocaleString()} recorded successfully`);
       setShowPaymentModal(false);
       setPaymentData({
         amount: '',
@@ -91,7 +90,8 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         description: '',
         type: 'PAYMENT',
       });
-      loadData(); // Refresh data
+      await loadClients(); // Refresh all clients to get updated balances
+      loadData(); // Refresh current client and ledger
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to record payment');
     }
@@ -195,7 +195,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
       <View style={styles.listContainer}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Transaction History</Text>
         <FlatList
-          data={ledger}
+          data={ledgerEntries}
           renderItem={renderLedgerItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}

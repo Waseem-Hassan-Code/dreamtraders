@@ -250,6 +250,58 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* Developer Tools Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Developer Tools
+          </Text>
+          <View
+            style={[
+              styles.settingCard,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.settingRow}
+              onPress={() => {
+                Alert.alert(
+                  'Reset Database',
+                  'This will delete ALL data and reset the database to its initial state. This action cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Reset',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const database = (await import('@/database')).default;
+                          database.resetDatabase();
+                          Alert.alert('Success', 'Database has been reset. Please restart the app.');
+                        } catch (error: any) {
+                          Alert.alert('Error', error.message || 'Failed to reset database');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="database-refresh" size={24} color={theme.danger} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>
+                    Reset Database
+                  </Text>
+                  <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                    Clear all data and reinitialize
+                  </Text>
+                </View>
+              </View>
+              <Icon name="chevron-right" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Category Management Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
