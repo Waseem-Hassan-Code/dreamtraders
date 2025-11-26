@@ -52,18 +52,11 @@ export default function StockManagementScreen({ navigation }: any) {
   });
 
   useEffect(() => {
-    console.log('[StockScreen] Loading stock items...');
     loadStockItems('all');
     loadCategories();
   }, []);
 
-  useEffect(() => {
-    console.log(
-      '[StockScreen] stockItems updated:',
-      stockItems?.length || 0,
-      'items',
-    );
-  }, [stockItems]);
+  useEffect(() => {}, [stockItems]);
 
   const enabledCategories = categories
     .filter(c => c.enabled)
@@ -357,9 +350,7 @@ export default function StockManagementScreen({ navigation }: any) {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           Stock Management
         </Text>
-        <TouchableOpacity onPress={handleOpenAddModal}>
-          <Icon name="plus-circle" size={28} color={theme.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <View
@@ -423,6 +414,8 @@ export default function StockManagementScreen({ navigation }: any) {
                 styles.categoryChipText,
                 { color: selectedCategory === cat.id ? '#fff' : theme.text },
               ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
               {cat.name}
             </Text>
@@ -451,6 +444,14 @@ export default function StockManagementScreen({ navigation }: any) {
           </View>
         }
       />
+
+      {/* FAB Button */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.primary }]}
+        onPress={handleOpenAddModal}
+      >
+        <Icon name="plus" size={32} color="#fff" />
+      </TouchableOpacity>
 
       <Modal
         visible={showAddModal}
@@ -1026,18 +1027,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: { flex: 1, fontSize: 16 },
-  categoryScroll: { maxHeight: 50 },
-  categoryScrollContent: { paddingHorizontal: 16, gap: 8, paddingVertical: 8 },
+  categoryScroll: { maxHeight: 56 },
+  categoryScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     gap: 6,
+    height: 36,
   },
-  categoryChipText: { fontSize: 14, fontWeight: '600' },
+  categoryChipText: { fontSize: 13, fontWeight: '600', maxWidth: 80 },
   listContent: { padding: 16 },
   stockCard: {
     padding: 16,
@@ -1254,5 +1261,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 20,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });

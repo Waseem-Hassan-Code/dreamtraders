@@ -8,9 +8,6 @@ const { loadConfig } = require('metro-config');
     port: 8081,
   });
   ``;
-
-  console.log('Metro server is running on http://localhost:8081');
-  console.log('Server object:', !!server);
 })().catch(error => {
   console.error('Failed to start Metro:', error);
   process.exit(1);

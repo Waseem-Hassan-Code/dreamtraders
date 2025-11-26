@@ -18,21 +18,15 @@ export class Database {
   public async connect(): Promise<void> {
     // Prevent multiple connections
     if (this.isConnected) {
-      console.log('Database already connected, skipping initialization');
       return;
     }
 
     try {
-      console.log('Opening database:', this.dbName);
       this.db = open({ name: this.dbName });
-      this.isConnected = true; // Set this BEFORE initializeTables to avoid deadlock
-      console.log('Database opened, initializing tables...');
+      this.isConnected = true;
       await this.initializeTables();
-      console.log('Database initialization complete!');
     } catch (error) {
-      this.isConnected = false; // Reset on error
-      console.error('Database connection failed:', error);
-      console.error('Error details:', JSON.stringify(error));
+      this.isConnected = false;
       throw error;
     }
   }
@@ -232,15 +226,12 @@ export class Database {
     ];
 
     try {
-      console.log('Creating tables...');
       for (const table of tables) {
         await this.execute(table);
       }
-      console.log('Creating indices...');
       for (const index of indices) {
         await this.execute(index);
       }
-      console.log('Database tables initialized');
       await this.seedDefaultData();
 
       // Run migrations after tables are created
@@ -253,8 +244,6 @@ export class Database {
 
   private async runMigrations(): Promise<void> {
     try {
-      console.log('Running database migrations...');
-
       // Check if migrations table exists
       await this.execute(`
         CREATE TABLE IF NOT EXISTS migrations (
@@ -273,17 +262,13 @@ export class Database {
       const migration1 = 'add_deleted_at_to_stock_items';
       // ... migration logic removed ...
       */
-
-      console.log('All migrations completed successfully');
     } catch (error) {
-      console.error('Migration failed:', error);
       throw error;
     }
   }
 
   private async seedDefaultData(): Promise<void> {
     try {
-      console.log('Seeding default data...');
       // Check if settings exist
       const settings = await this.execute('SELECT * FROM settings LIMIT 1');
       const hasSettings =
@@ -339,7 +324,6 @@ export class Database {
           [category.id, category.name, category.icon, category.color],
         );
       }
-      console.log('Default data seeded successfully');
     } catch (error) {
       console.error('Failed to seed default data:', error);
     }
@@ -364,12 +348,6 @@ export class Database {
         }
       }
 
-      console.log(
-        'Executing SQL:',
-        sql.substring(0, 100),
-        params ? `with ${params.length} params` : '',
-      );
-
       // op-sqlite execute - handle both sync and async modes
       let result = this.db.execute(sql, params);
 
@@ -377,9 +355,6 @@ export class Database {
       if (result && typeof result.then === 'function') {
         result = await result;
       }
-
-      console.log('Raw SQL result:', JSON.stringify(result));
-
       const rowsArray = Array.isArray(result?.rows)
         ? result.rows
         : result?.rows?._array || [];
@@ -394,9 +369,6 @@ export class Database {
         rowsAffected: result?.rowsAffected,
       };
 
-      console.log(
-        `[DB] SQL result - Rows: ${standardResult.rows._array.length}, Affected: ${standardResult.rowsAffected}, InsertId: ${standardResult.insertId}`,
-      );
       return standardResult;
     } catch (error) {
       console.error('SQL execution error:', error);
@@ -427,12 +399,10 @@ export class Database {
     if (this.db) {
       await this.db.close();
       this.isConnected = false;
-      console.log('Database closed');
     }
   }
 
   public async resetDatabase(): Promise<void> {
-    console.log('Resetting database...');
     try {
       // Drop all tables
       const tables = [
@@ -455,9 +425,7 @@ export class Database {
         await this.execute(`DROP TABLE IF EXISTS ${table}`);
       }
 
-      console.log('All tables dropped, reinitializing...');
       await this.initializeTables();
-      console.log('Database reset complete!');
     } catch (error) {
       console.error('Failed to reset database:', error);
       throw error;

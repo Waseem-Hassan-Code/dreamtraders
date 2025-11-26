@@ -12,11 +12,6 @@ export class StockRepository implements IStockRepository {
     const result = await database.execute(
       'SELECT * FROM stock_items WHERE deleted_at IS NULL ORDER BY name',
     );
-    console.log(
-      '[StockRepo] getAll raw result:',
-      JSON.stringify(result?.rows?._array?.length || 0),
-      'items',
-    );
     return this.mapRows(result.rows?._array || []);
   }
 
@@ -77,8 +72,6 @@ export class StockRepository implements IStockRepository {
           SUM(current_quantity * sale_price) as sale_value
          FROM stock_items WHERE deleted_at IS NULL`,
       );
-
-      console.log('getStockValue result:', JSON.stringify(result));
 
       if (!result || !result.rows) {
         return { purchaseValue: 0, saleValue: 0 };

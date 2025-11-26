@@ -463,11 +463,11 @@ const styles = StyleSheet.create({
   invoiceNumber: { fontSize: 16, fontWeight: 'bold' },
   clientName: { fontSize: 14, marginTop: 2 },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  statusText: { fontSize: 12, fontWeight: 'bold' },
+  statusText: { fontSize: 11, fontWeight: 'bold' },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
