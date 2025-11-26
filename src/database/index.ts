@@ -15,7 +15,7 @@ export class Database {
     return Database.instance;
   }
 
-  public connect(): void {
+  public async connect(): Promise<void> {
     // Prevent multiple connections
     if (this.isConnected) {
       console.log('Database already connected, skipping initialization');
@@ -26,7 +26,7 @@ export class Database {
       console.log('Opening database:', this.dbName);
       this.db = open({ name: this.dbName });
       console.log('Database opened, initializing tables...');
-      this.initializeTables();
+      await this.initializeTables();
       this.isConnected = true;
       console.log('Database initialization complete!');
     } catch (error) {
@@ -36,10 +36,7 @@ export class Database {
     }
   }
 
-  private initializeTables(): void {
-    // Run migrations first
-    this.runMigrations();
-
+  private async initializeTables(): Promise<void> {
     const tables = [
       // Categories table
       `CREATE TABLE IF NOT EXISTS categories (
@@ -243,14 +240,17 @@ export class Database {
         this.execute(index);
       }
       console.log('Database tables initialized');
-      this.seedDefaultData();
+      await this.seedDefaultData();
+      
+      // Run migrations after tables are created
+      await this.runMigrations();
     } catch (error) {
       console.error('Failed to initialize tables:', error);
       throw error;
     }
   }
 
-  private runMigrations(): void {
+  private async runMigrations(): Promise<void> {
     try {
       console.log('Running database migrations...');
 
@@ -264,36 +264,14 @@ export class Database {
       `);
 
       // Migration 1: Add deleted_at to stock_items (if not exists)
+      // This migration is now part of the initial schema, so we skip it for new installs
+      // and only keep the logic if we strictly need to support very old versions.
+      // Since we are fixing a crash, we'll comment it out or remove it to prevent duplicates.
+      
+      /* 
       const migration1 = 'add_deleted_at_to_stock_items';
-      const hasMigration1 = this.execute(
-        'SELECT * FROM migrations WHERE name = ?',
-        [migration1],
-      );
-
-      // Check both possible result structures
-      const migration1Exists = 
-        (hasMigration1.rows?.length > 0) || 
-        (hasMigration1.rows?._array?.length > 0);
-
-      if (!migration1Exists) {
-        console.log('Running migration: ' + migration1);
-
-        // Check if column already exists
-        const tableInfo = this.execute('PRAGMA table_info(stock_items)');
-        const hasDeletedAt = tableInfo.rows?._array?.some(
-          (col: any) => col.name === 'deleted_at',
-        );
-
-        if (!hasDeletedAt) {
-          this.execute('ALTER TABLE stock_items ADD COLUMN deleted_at INTEGER');
-        }
-
-        this.execute(
-          'INSERT OR IGNORE INTO migrations (name, executed_at) VALUES (?, ?)',
-          [migration1, Date.now()],
-        );
-        console.log('Migration completed: ' + migration1);
-      }
+      // ... migration logic removed ...
+      */
 
       console.log('All migrations completed successfully');
     } catch (error) {
@@ -302,7 +280,7 @@ export class Database {
     }
   }
 
-  private seedDefaultData(): void {
+  private async seedDefaultData(): Promise<void> {
     try {
       console.log('Seeding default data...');
       // Check if settings exist
@@ -377,23 +355,24 @@ export class Database {
       // op-sqlite execute is synchronous
       const result = this.db.execute(sql, params);
       
-      // Ensure result has a consistent structure
-      if (!result) {
-        return { rows: { _array: [], length: 0 } };
+      // Create a standardized result object
+      const standardResult = {
+        rows: {
+          _array: result?.rows?._array || [],
+          length: result?.rows?.length || 0,
+          item: result?.rows?.item, // Preserve item function if it exists
+        },
+        insertId: result?.insertId,
+        rowsAffected: result?.rowsAffected,
+      };
+      
+      // If _array is still missing (some versions might not have it), try to construct it or default to empty
+      if (!standardResult.rows._array) {
+        standardResult.rows._array = [];
       }
       
-      // If result.rows is undefined, initialize it
-      if (!result.rows) {
-        result.rows = { _array: [], length: 0 };
-      }
-      
-      // Ensure _array exists
-      if (!result.rows._array) {
-        result.rows._array = [];
-      }
-      
-      console.log('SQL result rows:', result.rows._array?.length || 0);
-      return result;
+      console.log(`[DB] SQL result - Rows: ${standardResult.rows._array.length}, Affected: ${standardResult.rowsAffected}, InsertId: ${standardResult.insertId}`);
+      return standardResult;
     } catch (error) {
       console.error('SQL execution error:', error);
       console.error('SQL:', sql);

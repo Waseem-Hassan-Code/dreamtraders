@@ -24,7 +24,7 @@ function App() {
   const initializeApp = async () => {
     try {
       setDebugInfo('Opening database...');
-      database.connect();
+      await database.connect();
       setDebugInfo('Database connected!');
       setIsDbReady(true);
     } catch (err: any) {

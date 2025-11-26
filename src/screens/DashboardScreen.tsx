@@ -33,11 +33,14 @@ export default function DashboardScreen({ navigation }: any) {
   >([]);
 
   useEffect(() => {
-    loadLowStockItems();
-    loadClients();
-    loadStockItems('all');
-    loadStockStats();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadLowStockItems();
+      loadClients();
+      loadStockItems('all');
+      loadStockStats();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadStockStats = async () => {
     try {
@@ -344,45 +347,7 @@ export default function DashboardScreen({ navigation }: any) {
           />
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Quick Actions
-          </Text>
-          <View style={styles.actionGrid}>
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('StockManagement')}
-            >
-              <Icon name="package-variant-plus" size={32} color="#fff" />
-              <Text style={styles.actionText}>Add Stock</Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: theme.success }]}
-              onPress={() => navigation.navigate('InvoiceList')}
-            >
-              <Icon name="receipt-text-plus" size={32} color="#fff" />
-              <Text style={styles.actionText}>New Invoice</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: theme.warning }]}
-              onPress={() => navigation.navigate('ClientList')}
-            >
-              <Icon name="account-plus" size={32} color="#fff" />
-              <Text style={styles.actionText}>Add Client</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: theme.danger }]}
-              onPress={() => navigation.navigate('ExpenseList')}
-            >
-              <Icon name="cash-minus" size={32} color="#fff" />
-              <Text style={styles.actionText}>Add Expense</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         <View style={{ height: 20 }} />
       </ScrollView>

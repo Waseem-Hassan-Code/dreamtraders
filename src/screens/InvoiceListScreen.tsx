@@ -96,8 +96,14 @@ export default function InvoiceListScreen({ navigation }: any) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Icon name="receipt-text" size={64} color={theme.textTertiary} />
+            <Icon name="receipt" size={64} color={theme.textTertiary} />
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No invoices found</Text>
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('CreateInvoice')}
+            >
+              <Text style={styles.emptyButtonText}>Create Your First Invoice</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -177,5 +183,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  emptyButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

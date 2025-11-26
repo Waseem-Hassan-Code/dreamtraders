@@ -65,35 +65,57 @@ export class StockRepository implements IStockRepository {
   }
 
   async getStockValue(): Promise<{ purchaseValue: number; saleValue: number }> {
-    const result = await database.execute(
-      `SELECT 
-        SUM(current_quantity * purchase_price) as purchase_value,
-        SUM(current_quantity * sale_price) as sale_value
-       FROM stock_items WHERE deleted_at IS NULL`,
-    );
-    const row = result.rows?._array[0];
-    return {
-      purchaseValue: row?.purchase_value || 0,
-      saleValue: row?.sale_value || 0,
-    };
+    try {
+      const result = await database.execute(
+        `SELECT 
+          SUM(current_quantity * purchase_price) as purchase_value,
+          SUM(current_quantity * sale_price) as sale_value
+         FROM stock_items WHERE deleted_at IS NULL`,
+      );
+      
+      console.log('getStockValue result:', JSON.stringify(result));
+      
+      if (!result || !result.rows) {
+        return { purchaseValue: 0, saleValue: 0 };
+      }
+
+      const row = result.rows._array?.[0];
+      return {
+        purchaseValue: row?.purchase_value || 0,
+        saleValue: row?.sale_value || 0,
+      };
+    } catch (error) {
+      console.error('Error in getStockValue:', error);
+      return { purchaseValue: 0, saleValue: 0 };
+    }
   }
 
   async getStockValueByCategory(): Promise<
     { categoryId: string; value: number }[]
   > {
-    const result = await database.execute(
-      `SELECT 
-        category_id,
-        SUM(current_quantity * sale_price) as value
-       FROM stock_items 
-       WHERE deleted_at IS NULL
-       GROUP BY category_id`,
-    );
-    const rows = result.rows?._array || [];
-    return rows.map((row: any) => ({
-      categoryId: row.category_id,
-      value: row.value || 0,
-    }));
+    try {
+      const result = await database.execute(
+        `SELECT 
+          category_id,
+          SUM(current_quantity * sale_price) as value
+         FROM stock_items 
+         WHERE deleted_at IS NULL
+         GROUP BY category_id`,
+      );
+      
+      if (!result || !result.rows || !result.rows._array) {
+        return [];
+      }
+
+      const rows = result.rows._array;
+      return rows.map((row: any) => ({
+        categoryId: row.category_id,
+        value: row.value || 0,
+      }));
+    } catch (error) {
+      console.error('Error in getStockValueByCategory:', error);
+      return [];
+    }
   }
 
   async create(

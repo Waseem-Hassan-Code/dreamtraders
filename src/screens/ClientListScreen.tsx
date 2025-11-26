@@ -40,8 +40,11 @@ export default function ClientListScreen({ navigation }: any) {
   });
 
   useEffect(() => {
-    loadClients();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadClients();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const filteredClients = clients.filter(
     client =>
@@ -265,9 +268,6 @@ export default function ClientListScreen({ navigation }: any) {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           Clients ({clients.length})
         </Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)}>
-          <Icon name="plus-circle" size={28} color={theme.primary} />
-        </TouchableOpacity>
       </View>
 
       <View
@@ -304,6 +304,13 @@ export default function ClientListScreen({ navigation }: any) {
           </View>
         }
       />
+
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.primary }]}
+        onPress={() => setShowAddModal(true)}
+      >
+        <Icon name="plus" size={32} color="#fff" />
+      </TouchableOpacity>
 
       {/* Add/Edit Client Modal */}
       <Modal
@@ -631,6 +638,21 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, marginTop: 16, marginBottom: 24 },
   emptyButton: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
   emptyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

@@ -42,27 +42,96 @@ export class ClientRepository implements IClientRepository {
     const id = generateUUID();
     const now = Date.now();
 
-    await database.execute(
-      `INSERT INTO clients (
-        id, name, phone, whatsapp, email, dob, shop_name, address, area, 
-        balance, total_business_value, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        data.name,
-        data.phone,
-        data.whatsapp || null,
-        data.email || null,
-        data.dob ? data.dob.getTime() : null,
-        data.shopName,
-        data.address || null,
-        data.area || null,
-        data.balance,
-        data.totalBusinessValue,
-        now,
-        now,
-      ],
+    // Check if client exists (including deleted)
+    const existingResult = await database.execute(
+      'SELECT * FROM clients WHERE phone = ?',
+      [data.phone],
     );
+    
+    if (existingResult?.rows?._array?.length > 0) {
+      const existing = existingResult.rows._array[0];
+      if (existing.deleted_at) {
+        // Restore deleted client
+        const updates: string[] = [];
+        const params: any[] = [];
+        
+        // Update all fields
+        const fieldMap: Record<string, string> = {
+          name: 'name',
+          whatsapp: 'whatsapp',
+          email: 'email',
+          dob: 'dob',
+          shopName: 'shop_name',
+          address: 'address',
+          area: 'area',
+          balance: 'balance',
+          totalBusinessValue: 'total_business_value',
+        };
+
+        Object.entries(fieldMap).forEach(([key, column]) => {
+          if (data[key as keyof typeof data] !== undefined) {
+            updates.push(`${column} = ?`);
+            let value = data[key as keyof typeof data];
+            if (key === 'dob' && value instanceof Date) {
+              value = value.getTime();
+            }
+            params.push(value);
+          }
+        });
+
+        updates.push('deleted_at = NULL');
+        updates.push('updated_at = ?');
+        params.push(now);
+        params.push(existing.id);
+
+        await database.execute(
+          `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`,
+          params,
+        );
+
+        return {
+          id: existing.id,
+          ...data,
+          createdAt: new Date(existing.created_at),
+          updatedAt: new Date(now),
+        };
+      } else {
+        throw new Error('A client with this phone number already exists');
+      }
+    }
+
+    try {
+      const result = await database.execute(
+        `INSERT INTO clients (
+          id, name, phone, whatsapp, email, dob, shop_name, address, area, 
+          balance, total_business_value, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          data.name,
+          data.phone,
+          data.whatsapp || null,
+          data.email || null,
+          data.dob ? data.dob.getTime() : null,
+          data.shopName,
+          data.address || null,
+          data.area || null,
+          data.balance,
+          data.totalBusinessValue,
+          now,
+          now,
+        ],
+      );
+
+      if (result.rowsAffected === 0) {
+        throw new Error('Failed to create client: No rows affected');
+      }
+    } catch (error: any) {
+      if (error.message?.includes('UNIQUE constraint failed: clients.phone')) {
+        throw new Error('A client with this phone number already exists');
+      }
+      throw error;
+    }
 
     return {
       id,

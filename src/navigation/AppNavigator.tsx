@@ -68,7 +68,7 @@ function TabNavigator() {
         options={{
           tabBarLabel: 'Invoices',
           tabBarIcon: ({ color, size }) => (
-            <Icon name="receipt-text" size={size} color={color} />
+            <Icon name="receipt" size={size} color={color} />
           ),
         }}
       />
