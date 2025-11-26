@@ -25,11 +25,12 @@ export class Database {
     try {
       console.log('Opening database:', this.dbName);
       this.db = open({ name: this.dbName });
+      this.isConnected = true; // Set this BEFORE initializeTables to avoid deadlock
       console.log('Database opened, initializing tables...');
       await this.initializeTables();
-      this.isConnected = true;
       console.log('Database initialization complete!');
     } catch (error) {
+      this.isConnected = false; // Reset on error
       console.error('Database connection failed:', error);
       console.error('Error details:', JSON.stringify(error));
       throw error;
@@ -233,15 +234,15 @@ export class Database {
     try {
       console.log('Creating tables...');
       for (const table of tables) {
-        this.execute(table);
+        await this.execute(table);
       }
       console.log('Creating indices...');
       for (const index of indices) {
-        this.execute(index);
+        await this.execute(index);
       }
       console.log('Database tables initialized');
       await this.seedDefaultData();
-      
+
       // Run migrations after tables are created
       await this.runMigrations();
     } catch (error) {
@@ -255,7 +256,7 @@ export class Database {
       console.log('Running database migrations...');
 
       // Check if migrations table exists
-      this.execute(`
+      await this.execute(`
         CREATE TABLE IF NOT EXISTS migrations (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
@@ -267,7 +268,7 @@ export class Database {
       // This migration is now part of the initial schema, so we skip it for new installs
       // and only keep the logic if we strictly need to support very old versions.
       // Since we are fixing a crash, we'll comment it out or remove it to prevent duplicates.
-      
+
       /* 
       const migration1 = 'add_deleted_at_to_stock_items';
       // ... migration logic removed ...
@@ -284,14 +285,13 @@ export class Database {
     try {
       console.log('Seeding default data...');
       // Check if settings exist
-      const settings = this.execute('SELECT * FROM settings LIMIT 1');
-      const hasSettings = 
-        (settings.rows?.length > 0) || 
-        (settings.rows?._array?.length > 0);
-        
+      const settings = await this.execute('SELECT * FROM settings LIMIT 1');
+      const hasSettings =
+        settings.rows?.length > 0 || settings.rows?._array?.length > 0;
+
       if (!hasSettings) {
         // Insert default settings with OR IGNORE to prevent duplicates
-        this.execute(
+        await this.execute(
           `INSERT OR IGNORE INTO settings (id, business_name, owner_name, phone, currency, date_format, 
            dark_mode, whatsapp_enabled, backup_enabled, updated_at) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -334,7 +334,7 @@ export class Database {
       ];
 
       for (const category of expenseCategories) {
-        this.execute(
+        await this.execute(
           `INSERT OR IGNORE INTO expense_categories (id, name, icon, color) VALUES (?, ?, ?, ?)`,
           [category.id, category.name, category.icon, category.color],
         );
@@ -345,35 +345,58 @@ export class Database {
     }
   }
 
-  public execute(sql: string, params?: any[]): any {
+  public async execute(sql: string, params?: any[]): Promise<any> {
     try {
-      if (!this.db) {
-        throw new Error('Database not connected');
+      // Wait for database to be connected
+      if (!this.isConnected || !this.db) {
+        console.warn('Database not yet connected, waiting...');
+        // Wait a bit for connection to complete
+        let attempts = 0;
+        while (!this.isConnected && attempts < 50) {
+          await new Promise(resolve =>
+            setTimeout(() => resolve(undefined), 100),
+          );
+          attempts++;
+        }
+
+        if (!this.db) {
+          throw new Error('Database not connected after waiting');
+        }
       }
-      console.log('Executing SQL:', sql.substring(0, 100), params ? `with ${params.length} params` : '');
-      
-      // op-sqlite execute is synchronous
-      const result = this.db.execute(sql, params);
-      
+
+      console.log(
+        'Executing SQL:',
+        sql.substring(0, 100),
+        params ? `with ${params.length} params` : '',
+      );
+
+      // op-sqlite execute - handle both sync and async modes
+      let result = this.db.execute(sql, params);
+
+      // If result is a Promise, await it
+      if (result && typeof result.then === 'function') {
+        result = await result;
+      }
+
       console.log('Raw SQL result:', JSON.stringify(result));
-      
-      // Create a standardized result object
+
+      const rowsArray = Array.isArray(result?.rows)
+        ? result.rows
+        : result?.rows?._array || [];
+
       const standardResult = {
         rows: {
-          _array: result?.rows?._array || [],
-          length: result?.rows?.length || 0,
-          item: result?.rows?.item, // Preserve item function if it exists
+          _array: rowsArray,
+          length: rowsArray.length,
+          item: (index: number) => rowsArray[index],
         },
         insertId: result?.insertId,
         rowsAffected: result?.rowsAffected,
       };
-      
-      // If _array is still missing (some versions might not have it), try to construct it or default to empty
-      if (!standardResult.rows._array) {
-        standardResult.rows._array = [];
-      }
-      
-      console.log(`[DB] SQL result - Rows: ${standardResult.rows._array.length}, Affected: ${standardResult.rowsAffected}, InsertId: ${standardResult.insertId}`);
+
+      console.log(
+        `[DB] SQL result - Rows: ${standardResult.rows._array.length}, Affected: ${standardResult.rowsAffected}, InsertId: ${standardResult.insertId}`,
+      );
       return standardResult;
     } catch (error) {
       console.error('SQL execution error:', error);
@@ -404,7 +427,7 @@ export class Database {
     }
   }
 
-  public resetDatabase(): void {
+  public async resetDatabase(): Promise<void> {
     console.log('Resetting database...');
     try {
       // Drop all tables
@@ -425,11 +448,11 @@ export class Database {
       ];
 
       for (const table of tables) {
-        this.execute(`DROP TABLE IF EXISTS ${table}`);
+        await this.execute(`DROP TABLE IF EXISTS ${table}`);
       }
 
       console.log('All tables dropped, reinitializing...');
-      this.initializeTables();
+      await this.initializeTables();
       console.log('Database reset complete!');
     } catch (error) {
       console.error('Failed to reset database:', error);

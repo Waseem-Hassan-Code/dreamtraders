@@ -136,12 +136,15 @@ export const useStockStore = create<StockState>((set, get) => ({
   loadStockItems: async categoryId => {
     set({ isLoading: true, error: null });
     try {
+      console.log('[StockStore] Loading stock items for category:', categoryId);
       const items =
         categoryId === 'all' || !categoryId
           ? await stockRepository.getAll()
           : await stockRepository.getByCategoryId(categoryId);
+      console.log('[StockStore] Loaded items:', items.length);
       set({ stockItems: items, isLoading: false });
     } catch (error: any) {
+      console.error('[StockStore] Error loading items:', error);
       set({ error: error.message, isLoading: false });
     }
   },

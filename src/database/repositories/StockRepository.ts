@@ -12,6 +12,7 @@ export class StockRepository implements IStockRepository {
     const result = await database.execute(
       'SELECT * FROM stock_items WHERE deleted_at IS NULL ORDER BY name',
     );
+    console.log('[StockRepo] getAll raw result:', JSON.stringify(result?.rows?._array?.length || 0), 'items');
     return this.mapRows(result.rows?._array || []);
   }
 

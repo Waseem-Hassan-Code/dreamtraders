@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   FlatList,
   StatusBar,
 } from 'react-native';
@@ -16,7 +15,8 @@ import { useThemeStore } from '@/store/themeStore';
 import { useClientStore } from '@/store/clientStore';
 import { Client } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { showSuccessToast } from '@/utils/toast';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 export default function ClientListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -54,17 +54,33 @@ export default function ClientListScreen({ navigation }: any) {
   );
 
   const handleSaveClient = async () => {
-    if (!formData.name || !formData.phone || !formData.shopName) {
-      Alert.alert(
-        'Error',
-        'Please fill in all required fields (Name, Phone, Shop Name)',
-      );
+    if (!formData.name.trim()) {
+      showErrorToast('Validation Error', 'Please enter client name');
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      showErrorToast('Validation Error', 'Please enter phone number');
       return;
     }
 
     // Validate phone number
     if (formData.phone.length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+      showErrorToast(
+        'Validation Error',
+        'Phone number must be at least 10 digits',
+      );
+      return;
+    }
+
+    if (!formData.shopName.trim()) {
+      showErrorToast('Validation Error', 'Please enter shop name');
+      return;
+    }
+
+    // Validate email format if provided
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      showErrorToast('Validation Error', 'Please enter a valid email address');
       return;
     }
 
@@ -74,7 +90,10 @@ export default function ClientListScreen({ navigation }: any) {
           ...formData,
           dob: formData.dob,
         });
-        showSuccessToast('Client Updated', `${formData.name} has been updated successfully`);
+        showSuccessToast(
+          'Client Updated',
+          `${formData.name} has been updated successfully`,
+        );
       } else {
         await createClient({
           ...formData,
@@ -82,12 +101,15 @@ export default function ClientListScreen({ navigation }: any) {
           balance: 0,
           totalBusinessValue: 0,
         });
-        showSuccessToast('Client Added', `${formData.name} has been added successfully`);
+        showSuccessToast(
+          'Client Added',
+          `${formData.name} has been added successfully`,
+        );
       }
       resetForm();
       setShowAddModal(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save client');
+      showErrorToast('Error', error.message || 'Failed to save client');
     }
   };
 
@@ -106,19 +128,18 @@ export default function ClientListScreen({ navigation }: any) {
     setShowAddModal(true);
   };
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{visible: boolean; client: Client | null}>({visible: false, client: null});
+
   const handleDeleteClient = (client: Client) => {
-    Alert.alert(
-      'Delete Client',
-      `Are you sure you want to delete ${client.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteClient(client.id),
-        },
-      ],
-    );
+    setDeleteConfirm({visible: true, client});
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirm.client) {
+      await deleteClient(deleteConfirm.client.id);
+      showSuccessToast('Client Deleted', `${deleteConfirm.client.name} has been deleted`);
+    }
+    setDeleteConfirm({visible: false, client: null});
   };
 
   const resetForm = () => {
@@ -149,7 +170,9 @@ export default function ClientListScreen({ navigation }: any) {
         styles.clientCard,
         { backgroundColor: theme.card, borderColor: theme.border },
       ]}
-      onPress={() => navigation.navigate('ClientDetails', { clientId: item.id })}
+      onPress={() =>
+        navigation.navigate('ClientDetails', { clientId: item.id })
+      }
     >
       <View style={styles.clientHeader}>
         <View
@@ -554,6 +577,19 @@ export default function ClientListScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        visible={deleteConfirm.visible}
+        title="Delete Client"
+        message={`Are you sure you want to delete ${deleteConfirm.client?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        icon="account-remove"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({visible: false, client: null})}
+      />
     </View>
   );
 }

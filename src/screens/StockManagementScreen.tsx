@@ -17,7 +17,7 @@ import { useStockStore } from '@/store/stockStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { StockItem, CategorySettings } from '@/types';
 import { generateId } from '@/utils/idGenerator';
-import { showSuccessToast } from '@/utils/toast';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
 
 export default function StockManagementScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -47,9 +47,14 @@ export default function StockManagementScreen({ navigation }: any) {
   });
 
   useEffect(() => {
+    console.log('[StockScreen] Loading stock items...');
     loadStockItems('all');
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    console.log('[StockScreen] stockItems updated:', stockItems?.length || 0, 'items');
+  }, [stockItems]);
 
   const enabledCategories = categories
     .filter(c => c.enabled)
@@ -64,9 +69,26 @@ export default function StockManagementScreen({ navigation }: any) {
   );
 
   const handleSaveStock = async () => {
-    if (!formData.name || !formData.sku || !formData.purchasePrice) {
-      Alert.alert('Missing Information', 'Please fill in all required fields');
+    if (!formData.name.trim()) {
+      showErrorToast('Validation Error', 'Please enter product name');
       return;
+    }
+
+    if (!formData.sku.trim()) {
+      showErrorToast('Validation Error', 'Please enter SKU');
+      return;
+    }
+
+    if (!formData.purchasePrice || parseFloat(formData.purchasePrice) <= 0) {
+      showErrorToast('Validation Error', 'Please enter a valid purchase price');
+      return;
+    }
+
+    if (
+      formData.salePrice &&
+      parseFloat(formData.salePrice) < parseFloat(formData.purchasePrice)
+    ) {
+      showErrorToast('Warning', 'Sale price is less than purchase price');
     }
 
     try {
@@ -94,19 +116,22 @@ export default function StockManagementScreen({ navigation }: any) {
 
       if (editingItem) {
         await updateStockItem(stockItem.id, stockItem);
-        showSuccessToast('Stock Updated', `${formData.name} has been updated successfully`);
+        showSuccessToast(
+          'Stock Updated',
+          `${formData.name} has been updated successfully`,
+        );
       } else {
         await createStockItem(stockItem);
         showSuccessToast(
           'Stock Added',
-          `${formData.name} (${formData.currentQuantity} ${formData.unit}) added successfully`
+          `${formData.name} (${formData.currentQuantity} ${formData.unit}) added successfully`,
         );
       }
 
       resetForm();
       setShowAddModal(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save stock item');
+      showErrorToast('Error', error.message || 'Failed to save stock item');
     }
   };
 

@@ -18,7 +18,7 @@ import { useClientStore } from '@/store/clientStore';
 import { useStockStore } from '@/store/stockStore';
 import { useInvoiceStore } from '@/store/invoiceStore';
 import { Client, StockItem, SaleItem } from '@/types';
-import { showSuccessToast } from '@/utils/toast';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
 
 export default function InvoiceCreateScreen({ navigation, route }: any) {
   const { theme, isDark } = useThemeStore();
@@ -29,7 +29,7 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<SaleItem[]>([]);
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  
+
   // Modals
   const [showClientModal, setShowClientModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
@@ -47,13 +47,13 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
       loadClients();
       loadStockItems('all');
       loadInvoiceNumber();
-      
+
       // Pre-select client if passed from Client Details
       if (route.params?.clientId) {
         const client = clients.find(c => c.id === route.params.clientId);
         if (client) setSelectedClient(client);
       }
-    }, [route.params?.clientId])
+    }, [route.params?.clientId]),
   );
 
   const loadInvoiceNumber = async () => {
@@ -63,9 +63,14 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
 
   const addItemToInvoice = (item: StockItem) => {
     const existingItem = invoiceItems.find(i => i.stockItemId === item.id);
-    
+
     if (existingItem) {
-      Alert.alert('Item already added', 'Adjust quantity in the list.');
+      showErrorToast('Item Already Added', 'Adjust quantity in the list');
+      return;
+    }
+
+    if (item.currentQuantity <= 0) {
+      showErrorToast('Out of Stock', `${item.name} is out of stock`);
       return;
     }
 
@@ -113,11 +118,16 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
 
   const handleSaveInvoice = async () => {
     if (!selectedClient) {
-      Alert.alert('Error', 'Please select a client');
+      showErrorToast('Validation Error', 'Please select a client');
       return;
     }
     if (invoiceItems.length === 0) {
-      Alert.alert('Error', 'Please add at least one item');
+      showErrorToast('Validation Error', 'Please add at least one item');
+      return;
+    }
+
+    if (paid > total) {
+      showErrorToast('Validation Error', 'Amount paid cannot exceed total');
       return;
     }
 
@@ -137,33 +147,48 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
         notes,
       });
 
-      showSuccessToast('Invoice Created', `Invoice #${invoiceNumber} created successfully`);
+      showSuccessToast(
+        'Invoice Created',
+        `Invoice #${invoiceNumber} created successfully`,
+      );
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create invoice');
+      showErrorToast('Error', error.message || 'Failed to create invoice');
     }
   };
 
-  const filteredStock = stockItems.filter(item => 
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStock = stockItems.filter(
+    item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.shopName.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredClients = clients.filter(
+    client =>
+      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.shopName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.surface} />
-      
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.surface}
+      />
+
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.surface, borderBottomColor: theme.border },
+        ]}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="close" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>New Invoice</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          New Invoice
+        </Text>
         <TouchableOpacity onPress={handleSaveInvoice}>
           <Text style={[styles.saveText, { color: theme.primary }]}>SAVE</Text>
         </TouchableOpacity>
@@ -171,85 +196,158 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
 
       <ScrollView style={styles.content}>
         {/* Invoice Info */}
-        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
           <View style={styles.row}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Invoice #</Text>
-            <Text style={[styles.value, { color: theme.text }]}>{invoiceNumber}</Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>
+              Invoice #
+            </Text>
+            <Text style={[styles.value, { color: theme.text }]}>
+              {invoiceNumber}
+            </Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.row}
             onPress={() => {
               setSearchQuery('');
               setShowClientModal(true);
             }}
           >
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Client</Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>
+              Client
+            </Text>
             <View style={styles.clientSelect}>
-              <Text style={[styles.value, { color: selectedClient ? theme.text : theme.textTertiary }]}>
+              <Text
+                style={[
+                  styles.value,
+                  { color: selectedClient ? theme.text : theme.textTertiary },
+                ]}
+              >
                 {selectedClient ? selectedClient.name : 'Select Client'}
               </Text>
-              <Icon name="chevron-right" size={20} color={theme.textSecondary} />
+              <Icon
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+              />
             </View>
           </TouchableOpacity>
         </View>
 
         {/* Items List */}
         <View style={styles.itemsHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Items</Text>
-          <TouchableOpacity onPress={() => {
-            setSearchQuery('');
-            setShowItemModal(true);
-          }}>
-            <Text style={[styles.addText, { color: theme.primary }]}>+ Add Item</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Items
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setSearchQuery('');
+              setShowItemModal(true);
+            }}
+          >
+            <Text style={[styles.addText, { color: theme.primary }]}>
+              + Add Item
+            </Text>
           </TouchableOpacity>
         </View>
 
         {invoiceItems.map((item, index) => (
-          <View key={index} style={[styles.itemCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View
+            key={index}
+            style={[
+              styles.itemCard,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
             <View style={styles.itemHeader}>
-              <Text style={[styles.itemName, { color: theme.text }]}>{item.stockItemName}</Text>
+              <Text style={[styles.itemName, { color: theme.text }]}>
+                {item.stockItemName}
+              </Text>
               <TouchableOpacity onPress={() => removeItem(index)}>
                 <Icon name="close-circle" size={20} color={theme.danger} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.itemControls}>
               <View style={styles.controlGroup}>
-                <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Qty</Text>
+                <Text
+                  style={[styles.controlLabel, { color: theme.textSecondary }]}
+                >
+                  Qty
+                </Text>
                 <TextInput
-                  style={[styles.smallInput, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.smallInput,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   keyboardType="decimal-pad"
                   value={item.quantity.toString()}
-                  onChangeText={(text) => updateItemQuantity(index, parseFloat(text) || 0)}
+                  onChangeText={text =>
+                    updateItemQuantity(index, parseFloat(text) || 0)
+                  }
                 />
               </View>
               <View style={styles.controlGroup}>
-                <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Price</Text>
+                <Text
+                  style={[styles.controlLabel, { color: theme.textSecondary }]}
+                >
+                  Price
+                </Text>
                 <TextInput
-                  style={[styles.smallInput, { color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.smallInput,
+                    { color: theme.text, borderColor: theme.border },
+                  ]}
                   keyboardType="decimal-pad"
                   value={item.unitPrice.toString()}
-                  onChangeText={(text) => updateItemPrice(index, parseFloat(text) || 0)}
+                  onChangeText={text =>
+                    updateItemPrice(index, parseFloat(text) || 0)
+                  }
                 />
               </View>
               <View style={styles.controlGroup}>
-                <Text style={[styles.controlLabel, { color: theme.textSecondary }]}>Total</Text>
-                <Text style={[styles.itemTotal, { color: theme.text }]}>{item.total.toLocaleString()}</Text>
+                <Text
+                  style={[styles.controlLabel, { color: theme.textSecondary }]}
+                >
+                  Total
+                </Text>
+                <Text style={[styles.itemTotal, { color: theme.text }]}>
+                  {item.total.toLocaleString()}
+                </Text>
               </View>
             </View>
           </View>
         ))}
 
         {/* Summary */}
-        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 20 }]}>
+        <View
+          style={[
+            styles.section,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              marginTop: 20,
+            },
+          ]}
+        >
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Subtotal</Text>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{subtotal.toLocaleString()}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Subtotal
+            </Text>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>
+              {subtotal.toLocaleString()}
+            </Text>
           </View>
-          
+
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Discount</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Discount
+            </Text>
             <TextInput
               style={[styles.summaryInput, { color: theme.text }]}
               placeholder="0"
@@ -262,7 +360,9 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Tax</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Tax
+            </Text>
             <TextInput
               style={[styles.summaryInput, { color: theme.text }]}
               placeholder="0"
@@ -277,17 +377,36 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
           <View style={styles.summaryRow}>
-            <Text style={[styles.totalLabel, { color: theme.text }]}>Total</Text>
-            <Text style={[styles.totalValue, { color: theme.primary }]}>{total.toLocaleString()}</Text>
+            <Text style={[styles.totalLabel, { color: theme.text }]}>
+              Total
+            </Text>
+            <Text style={[styles.totalValue, { color: theme.primary }]}>
+              {total.toLocaleString()}
+            </Text>
           </View>
         </View>
 
         {/* Payment */}
-        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 20, marginBottom: 40 }]}>
+        <View
+          style={[
+            styles.section,
+            {
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              marginTop: 20,
+              marginBottom: 40,
+            },
+          ]}
+        >
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Amount Paid</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Amount Paid
+            </Text>
             <TextInput
-              style={[styles.summaryInput, { color: theme.success, fontWeight: 'bold' }]}
+              style={[
+                styles.summaryInput,
+                { color: theme.success, fontWeight: 'bold' },
+              ]}
               placeholder="0"
               placeholderTextColor={theme.textTertiary}
               keyboardType="decimal-pad"
@@ -298,8 +417,15 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           </View>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Balance Due</Text>
-            <Text style={[styles.summaryValue, { color: due > 0 ? theme.danger : theme.success }]}>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Balance Due
+            </Text>
+            <Text
+              style={[
+                styles.summaryValue,
+                { color: due > 0 ? theme.danger : theme.success },
+              ]}
+            >
               {due.toLocaleString()}
             </Text>
           </View>
@@ -308,13 +434,20 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
 
       {/* Client Selection Modal */}
       <Modal visible={showClientModal} animationType="slide">
-        <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+        <View
+          style={[styles.modalContainer, { backgroundColor: theme.background }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+          >
             <TouchableOpacity onPress={() => setShowClientModal(false)}>
               <Icon name="close" size={24} color={theme.text} />
             </TouchableOpacity>
             <TextInput
-              style={[styles.modalSearch, { color: theme.text, backgroundColor: theme.card }]}
+              style={[
+                styles.modalSearch,
+                { color: theme.text, backgroundColor: theme.card },
+              ]}
               placeholder="Search Clients..."
               placeholderTextColor={theme.textTertiary}
               value={searchQuery}
@@ -333,8 +466,17 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
                   setShowClientModal(false);
                 }}
               >
-                <Text style={[styles.listItemTitle, { color: theme.text }]}>{item.name}</Text>
-                <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]}>{item.shopName}</Text>
+                <Text style={[styles.listItemTitle, { color: theme.text }]}>
+                  {item.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.listItemSubtitle,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {item.shopName}
+                </Text>
               </TouchableOpacity>
             )}
           />
@@ -343,13 +485,20 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
 
       {/* Item Selection Modal */}
       <Modal visible={showItemModal} animationType="slide">
-        <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+        <View
+          style={[styles.modalContainer, { backgroundColor: theme.background }]}
+        >
+          <View
+            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+          >
             <TouchableOpacity onPress={() => setShowItemModal(false)}>
               <Icon name="close" size={24} color={theme.text} />
             </TouchableOpacity>
             <TextInput
-              style={[styles.modalSearch, { color: theme.text, backgroundColor: theme.card }]}
+              style={[
+                styles.modalSearch,
+                { color: theme.text, backgroundColor: theme.card },
+              ]}
               placeholder="Search Items..."
               placeholderTextColor={theme.textTertiary}
               value={searchQuery}
@@ -365,9 +514,16 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
                 style={[styles.listItem, { borderBottomColor: theme.border }]}
                 onPress={() => addItemToInvoice(item)}
               >
-                <View style={{flex: 1}}>
-                  <Text style={[styles.listItemTitle, { color: theme.text }]}>{item.name}</Text>
-                  <Text style={[styles.listItemSubtitle, { color: theme.textSecondary }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.listItemTitle, { color: theme.text }]}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.listItemSubtitle,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
                     Stock: {item.currentQuantity} {item.unit}
                   </Text>
                 </View>

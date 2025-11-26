@@ -8,7 +8,6 @@ import {
   StatusBar,
   Modal,
   TextInput,
-  Alert,
   ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -16,12 +15,20 @@ import { useThemeStore } from '@/store/themeStore';
 import { useExpenseStore } from '../store/expenseStore';
 import { Expense, ExpenseCategory } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { showSuccessToast } from '@/utils/toast';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 export default function ExpenseListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
-  const { expenses, categories, loadExpenses, loadCategories, createExpense, deleteExpense } = useExpenseStore();
-  
+  const {
+    expenses,
+    categories,
+    loadExpenses,
+    loadCategories,
+    createExpense,
+    deleteExpense,
+  } = useExpenseStore();
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,13 +52,26 @@ export default function ExpenseListScreen({ navigation }: any) {
   }, [categories]);
 
   const handleSaveExpense = async () => {
-    if (!formData.amount || !formData.categoryId || !formData.description) {
-      Alert.alert('Error', 'Please fill in Amount, Category and Description');
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      showErrorToast('Validation Error', 'Please enter a valid amount');
+      return;
+    }
+
+    if (!formData.categoryId) {
+      showErrorToast('Validation Error', 'Please select a category');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      showErrorToast('Validation Error', 'Please enter a description');
       return;
     }
 
     const category = categories.find(c => c.id === formData.categoryId);
-    if (!category) return;
+    if (!category) {
+      showErrorToast('Error', 'Invalid category selected');
+      return;
+    }
 
     try {
       await createExpense({
@@ -63,20 +83,27 @@ export default function ExpenseListScreen({ navigation }: any) {
         isRecurring: false,
         notes: formData.notes,
       });
-      
+
       showSuccessToast('Expense Added', 'Expense added successfully');
       setShowAddModal(false);
       resetForm();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save expense');
+      showErrorToast('Error', error.message || 'Failed to save expense');
     }
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert('Delete Expense', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(id) }
-    ]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{visible: boolean; expense: Expense | null}>({visible: false, expense: null});
+
+  const handleDelete = (expense: Expense) => {
+    setDeleteConfirm({visible: true, expense});
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirm.expense) {
+      await deleteExpense(deleteConfirm.expense.id);
+      showSuccessToast('Expense Deleted', 'Expense has been deleted');
+    }
+    setDeleteConfirm({visible: false, expense: null});
   };
 
   const resetForm = () => {
@@ -98,20 +125,45 @@ export default function ExpenseListScreen({ navigation }: any) {
   };
 
   const renderExpenseItem = ({ item }: { item: Expense }) => (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: theme.card, borderColor: theme.border },
+      ]}
+    >
       <View style={styles.cardLeft}>
-        <View style={[styles.iconBox, { backgroundColor: item.category.color + '20' }]}>
-          <Icon name={item.category.icon || 'cash'} size={24} color={item.category.color || theme.text} />
+        <View
+          style={[
+            styles.iconBox,
+            { backgroundColor: item.category.color + '20' },
+          ]}
+        >
+          <Icon
+            name={item.category.icon || 'cash'}
+            size={24}
+            color={item.category.color || theme.text}
+          />
         </View>
         <View style={styles.cardInfo}>
-          <Text style={[styles.desc, { color: theme.text }]}>{item.description}</Text>
-          <Text style={[styles.category, { color: theme.textSecondary }]}>{item.category.name}</Text>
-          <Text style={[styles.date, { color: theme.textTertiary }]}>{formatDate(item.date)}</Text>
+          <Text style={[styles.desc, { color: theme.text }]}>
+            {item.description}
+          </Text>
+          <Text style={[styles.category, { color: theme.textSecondary }]}>
+            {item.category.name}
+          </Text>
+          <Text style={[styles.date, { color: theme.textTertiary }]}>
+            {formatDate(item.date)}
+          </Text>
         </View>
       </View>
       <View style={styles.cardRight}>
-        <Text style={[styles.amount, { color: theme.danger }]}>- {item.amount.toLocaleString()}</Text>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
+        <Text style={[styles.amount, { color: theme.danger }]}>
+          - {item.amount.toLocaleString()}
+        </Text>
+        <TouchableOpacity
+          onPress={() => handleDelete(item)}
+          style={styles.deleteBtn}
+        >
           <Icon name="trash-can-outline" size={20} color={theme.textTertiary} />
         </TouchableOpacity>
       </View>
@@ -120,10 +172,20 @@ export default function ExpenseListScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.surface} />
-      
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Expenses</Text>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.surface}
+      />
+
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.surface, borderBottomColor: theme.border },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Expenses
+        </Text>
       </View>
 
       <FlatList
@@ -134,7 +196,9 @@ export default function ExpenseListScreen({ navigation }: any) {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={theme.textTertiary} />
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No expenses recorded</Text>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              No expenses recorded
+            </Text>
           </View>
         }
       />
@@ -149,70 +213,131 @@ export default function ExpenseListScreen({ navigation }: any) {
       {/* Add Expense Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Add Expense</Text>
+          <View
+            style={[styles.modalContent, { backgroundColor: theme.surface }]}
+          >
+            <View
+              style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Add Expense
+              </Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <Icon name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalBody}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Amount *</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>
+                Amount *
+              </Text>
               <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.card,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
                 placeholder="0.00"
                 placeholderTextColor={theme.textTertiary}
                 keyboardType="decimal-pad"
                 value={formData.amount}
-                onChangeText={text => setFormData({ ...formData, amount: text })}
+                onChangeText={text =>
+                  setFormData({ ...formData, amount: text })
+                }
                 autoFocus
               />
 
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Category *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>
+                Category *
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryScroll}
+              >
                 {categories.map(cat => (
                   <TouchableOpacity
                     key={cat.id}
                     style={[
                       styles.categoryChip,
-                      { 
-                        backgroundColor: formData.categoryId === cat.id ? cat.color : theme.card,
-                        borderColor: theme.border 
-                      }
+                      {
+                        backgroundColor:
+                          formData.categoryId === cat.id
+                            ? cat.color
+                            : theme.card,
+                        borderColor: theme.border,
+                      },
                     ]}
-                    onPress={() => setFormData({ ...formData, categoryId: cat.id })}
+                    onPress={() =>
+                      setFormData({ ...formData, categoryId: cat.id })
+                    }
                   >
-                    <Icon 
-                      name={cat.icon || 'circle'} 
-                      size={16} 
-                      color={formData.categoryId === cat.id ? '#fff' : cat.color} 
+                    <Icon
+                      name={cat.icon || 'circle'}
+                      size={16}
+                      color={
+                        formData.categoryId === cat.id ? '#fff' : cat.color
+                      }
                     />
-                    <Text style={[
-                      styles.categoryChipText, 
-                      { color: formData.categoryId === cat.id ? '#fff' : theme.text }
-                    ]}>
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        {
+                          color:
+                            formData.categoryId === cat.id
+                              ? '#fff'
+                              : theme.text,
+                        },
+                      ]}
+                    >
                       {cat.name}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Description *</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>
+                Description *
+              </Text>
               <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.card,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
                 placeholder="e.g. Lunch, Petrol"
                 placeholderTextColor={theme.textTertiary}
                 value={formData.description}
-                onChangeText={text => setFormData({ ...formData, description: text })}
+                onChangeText={text =>
+                  setFormData({ ...formData, description: text })
+                }
               />
 
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>
+                Date
+              </Text>
               <TouchableOpacity
-                style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  },
+                ]}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Text style={{ color: theme.text }}>{formatDate(formData.date)}</Text>
+                <Text style={{ color: theme.text }}>
+                  {formatDate(formData.date)}
+                </Text>
                 <Icon name="calendar" size={20} color={theme.textSecondary} />
               </TouchableOpacity>
 
@@ -223,24 +348,41 @@ export default function ExpenseListScreen({ navigation }: any) {
                   display="default"
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
-                    if (selectedDate) setFormData({ ...formData, date: selectedDate });
+                    if (selectedDate)
+                      setFormData({ ...formData, date: selectedDate });
                   }}
                   maximumDate={new Date()}
                 />
               )}
 
-              <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: theme.danger, marginTop: 24 }]}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  { backgroundColor: theme.danger, marginTop: 24 },
+                ]}
                 onPress={handleSaveExpense}
               >
                 <Text style={styles.saveButtonText}>Save Expense</Text>
               </TouchableOpacity>
-              
-              <View style={{height: 40}} />
+
+              <View style={{ height: 40 }} />
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        visible={deleteConfirm.visible}
+        title="Delete Expense"
+        message={`Are you sure you want to delete this expense of ₹${deleteConfirm.expense?.amount?.toLocaleString() || ''}?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        icon="cash-remove"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({visible: false, expense: null})}
+      />
     </View>
   );
 }

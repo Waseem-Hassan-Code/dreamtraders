@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background color matching your splash screen -->
+    <item android:drawable="@color/splash_background" />
+    
+    <!-- Optionally add your app icon or logo in the center -->
+    <!-- Uncomment if you want to show a logo during native splash -->
+    <!--
+    <item
+        android:width="200dp"
+        android:height="200dp"
+        android:drawable="@mipmap/ic_launcher"
+        android:gravity="center" />
+    -->
+</layer-list>
