@@ -15,6 +15,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemeStore } from '@/store/themeStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { CategorySettings } from '@/types';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
+import { Database } from '@/database';
 
 // Available icons for categories
 const AVAILABLE_ICONS = [
@@ -90,6 +93,10 @@ export default function SettingsScreen({ navigation }: any) {
     useState<CategorySettings | null>(null);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] =
+    useState<CategorySettings | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -125,18 +132,38 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const handleDeleteCategory = (category: CategorySettings) => {
-    Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteCategory(category.id),
-        },
-      ],
-    );
+    setCategoryToDelete(category);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (categoryToDelete) {
+      try {
+        await deleteCategory(categoryToDelete.id);
+        showSuccessToast(
+          'Deleted',
+          `Category "${categoryToDelete.name}" deleted`,
+        );
+      } catch (error) {
+        showErrorToast('Error', 'Failed to delete category');
+      }
+    }
+    setShowDeleteDialog(false);
+    setCategoryToDelete(null);
+  };
+
+  const handleResetDatabase = async () => {
+    try {
+      const database = (await import('@/database')).default;
+      database.resetDatabase();
+      showSuccessToast(
+        'Success',
+        'Database has been reset. Please restart the app.',
+      );
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to reset database');
+    }
+    setShowResetDialog(false);
   };
 
   const handleEditCategory = (category: CategorySettings) => {
@@ -284,28 +311,7 @@ export default function SettingsScreen({ navigation }: any) {
           >
             <TouchableOpacity
               style={styles.settingRow}
-              onPress={() => {
-                Alert.alert(
-                  'Reset Database',
-                  'This will delete ALL data and reset the database to its initial state. This action cannot be undone.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Reset',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          const database = (await import('@/database')).default;
-                          database.resetDatabase();
-                          Alert.alert('Success', 'Database has been reset. Please restart the app.');
-                        } catch (error: any) {
-                          Alert.alert('Error', error.message || 'Failed to reset database');
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
+              onPress={() => setShowResetDialog(true)}
             >
               <View style={styles.settingLeft}>
                 <Icon name="database-refresh" size={24} color={theme.danger} />
@@ -313,12 +319,18 @@ export default function SettingsScreen({ navigation }: any) {
                   <Text style={[styles.settingLabel, { color: theme.text }]}>
                     Reset Database
                   </Text>
-                  <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
                     Clear all data and reinitialize
                   </Text>
                 </View>
               </View>
-              <Icon name="chevron-right" size={20} color={theme.textSecondary} />
+              <Icon
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -615,6 +627,58 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Category Confirm Dialog */}
+      <ConfirmDialog
+        visible={showDeleteDialog}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${categoryToDelete?.name}"? This action cannot be undone.`}
+        type="danger"
+        icon="tag-remove"
+        confirmText="Delete"
+        onConfirm={() => {
+          if (categoryToDelete) {
+            deleteCategory(categoryToDelete.id);
+          }
+          setShowDeleteDialog(false);
+          setCategoryToDelete(null);
+        }}
+        onCancel={() => {
+          setShowDeleteDialog(false);
+          setCategoryToDelete(null);
+        }}
+      />
+
+      {/* Reset Database Confirm Dialog */}
+      <ConfirmDialog
+        visible={showResetDialog}
+        title="Reset Database"
+        message="This will delete ALL data including clients, invoices, stock, and expenses. This action cannot be undone!"
+        type="danger"
+        icon="database-remove"
+        confirmText="Reset All Data"
+        onConfirm={async () => {
+          try {
+            const db = Database.getInstance();
+            await db.execute('DELETE FROM invoice_items');
+            await db.execute('DELETE FROM invoices');
+            await db.execute('DELETE FROM ledger_entries');
+            await db.execute('DELETE FROM clients');
+            await db.execute('DELETE FROM stock_movements');
+            await db.execute('DELETE FROM stock_items');
+            await db.execute('DELETE FROM expenses');
+            showSuccessToast(
+              'Database Reset',
+              'All data has been cleared successfully',
+            );
+          } catch (error) {
+            console.error('Error resetting database:', error);
+            showErrorToast('Error', 'Failed to reset database');
+          }
+          setShowResetDialog(false);
+        }}
+        onCancel={() => setShowResetDialog(false)}
+      />
     </View>
   );
 }

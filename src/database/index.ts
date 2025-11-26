@@ -414,6 +414,10 @@ export class Database {
       await callback(this);
       await this.execute('COMMIT');
     } catch (error) {
+      console.error(
+        '[DB Transaction] Error during transaction, rolling back:',
+        error,
+      );
       await this.execute('ROLLBACK');
       throw error;
     }

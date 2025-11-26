@@ -1,8 +1,12 @@
 import { Invoice, IInvoiceRepository, Client, SaleItem } from '@/types';
 import database from '../index';
 import { generateUUID, generateInvoiceNumber } from '@/utils/idGenerator';
-import { clientRepository } from './ClientRepository';
-import { stockRepository } from './StockRepository';
+import { ClientRepository } from './ClientRepository';
+import { StockRepository } from './StockRepository';
+
+// Create local instances to avoid circular dependency issues
+const clientRepository = new ClientRepository();
+const stockRepository = new StockRepository();
 
 export class InvoiceRepository implements IInvoiceRepository {
   async getAll(): Promise<Invoice[]> {
@@ -110,10 +114,13 @@ export class InvoiceRepository implements IInvoiceRepository {
         );
 
         // Deduct stock quantity
-        await stockRepository.updateQuantity(item.stockItemId, -item.quantity, {
+        await stockRepository.updateQuantity(item.stockItemId, item.quantity, {
           type: 'OUT',
+          quantity: item.quantity,
           reason: `Sold via Invoice #${data.invoiceNumber}`,
-          referenceId: id,
+          reference: id,
+          stockItemId: item.stockItemId,
+          performedBy: 'System',
         });
       }
 
@@ -123,7 +130,7 @@ export class InvoiceRepository implements IInvoiceRepository {
 
         // Add ledger entry for the sale
         await database.execute(
-          `INSERT INTO client_ledger (
+          `INSERT INTO ledger_entries (
             id, client_id, date, type, description, debit, credit, balance, invoice_id, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [

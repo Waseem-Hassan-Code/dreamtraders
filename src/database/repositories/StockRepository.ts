@@ -224,48 +224,48 @@ export class StockRepository implements IStockRepository {
     quantity: number,
     movement: Omit<StockMovement, 'id' | 'createdAt'>,
   ): Promise<void> {
-    await database.transaction(async () => {
-      // Get current item
-      const item = await this.getById(id);
-      if (!item) throw new Error('Stock item not found');
+    // Get current item
+    const item = await this.getById(id);
+    if (!item) throw new Error('Stock item not found');
 
-      // Calculate new quantity
-      let newQuantity = item.currentQuantity;
-      if (movement.type === 'IN') {
-        newQuantity += quantity;
-      } else if (movement.type === 'OUT') {
-        newQuantity -= quantity;
-        if (newQuantity < 0) {
-          throw new Error('Insufficient stock');
-        }
-      } else if (movement.type === 'ADJUSTMENT') {
-        newQuantity = quantity;
+    // Calculate new quantity based on movement type
+    let newQuantity = item.currentQuantity;
+    const absQuantity = Math.abs(quantity);
+
+    if (movement.type === 'IN') {
+      newQuantity += absQuantity;
+    } else if (movement.type === 'OUT') {
+      newQuantity -= absQuantity;
+      if (newQuantity < 0) {
+        throw new Error('Insufficient stock');
       }
+    } else if (movement.type === 'ADJUSTMENT') {
+      newQuantity = quantity;
+    }
 
-      // Update stock quantity
-      await database.execute(
-        'UPDATE stock_items SET current_quantity = ?, updated_at = ? WHERE id = ?',
-        [newQuantity, Date.now(), id],
-      );
+    // Update stock quantity
+    await database.execute(
+      'UPDATE stock_items SET current_quantity = ?, updated_at = ? WHERE id = ?',
+      [newQuantity, Date.now(), id],
+    );
 
-      // Record movement
-      const movementId = generateUUID();
-      await database.execute(
-        `INSERT INTO stock_movements (
-          id, stock_item_id, type, quantity, reason, reference, performed_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          movementId,
-          id,
-          movement.type,
-          quantity,
-          movement.reason,
-          movement.reference || null,
-          movement.performedBy,
-          Date.now(),
-        ],
-      );
-    });
+    // Record movement
+    const movementId = generateUUID();
+    await database.execute(
+      `INSERT INTO stock_movements (
+        id, stock_item_id, type, quantity, reason, reference, performed_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        movementId,
+        id,
+        movement.type,
+        absQuantity,
+        movement.reason || null,
+        movement.reference || null,
+        movement.performedBy || 'System',
+        Date.now(),
+      ],
+    );
   }
 
   async delete(id: string): Promise<boolean> {

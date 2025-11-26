@@ -212,7 +212,7 @@ export default function StockManagementScreen({ navigation }: any) {
         type: 'IN',
         quantity: qty,
         reason: 'Stock replenishment',
-        performedBy: 'system',
+        performedBy: 'user',
       });
 
       await loadStockItems('all');
@@ -916,6 +916,33 @@ export default function StockManagementScreen({ navigation }: any) {
                 </Text>
                 <Text style={[styles.currentStockValue, { color: theme.text }]}>
                   {addStockItem?.currentQuantity} {addStockItem?.unit}
+                </Text>
+              </View>
+
+              {/* Total Value */}
+              <View
+                style={[
+                  styles.currentStockRow,
+                  {
+                    backgroundColor: theme.success + '15',
+                    borderColor: theme.success + '30',
+                    marginTop: 8,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.currentStockLabel, { color: theme.success }]}
+                >
+                  Total Value (Purchase)
+                </Text>
+                <Text
+                  style={[styles.currentStockValue, { color: theme.success }]}
+                >
+                  PKR{' '}
+                  {(
+                    (addStockItem?.currentQuantity || 0) *
+                    (addStockItem?.purchasePrice || 0)
+                  ).toLocaleString()}
                 </Text>
               </View>
 
