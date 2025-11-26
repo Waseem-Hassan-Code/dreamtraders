@@ -355,6 +355,8 @@ export class Database {
       // op-sqlite execute is synchronous
       const result = this.db.execute(sql, params);
       
+      console.log('Raw SQL result:', JSON.stringify(result));
+      
       // Create a standardized result object
       const standardResult = {
         rows: {
