@@ -85,7 +85,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: theme.card }]}>
           {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: getIconColor() + '15' }]}>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: getIconColor() + '15' },
+            ]}
+          >
             <Icon name={getIconName()} size={40} color={getIconColor()} />
           </View>
 
@@ -100,17 +105,30 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor: theme.border }]}
+              style={[
+                styles.button,
+                styles.cancelButton,
+                { borderColor: theme.border },
+              ]}
               onPress={onCancel}
               activeOpacity={0.7}
             >
-              <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>
+              <Text
+                style={[
+                  styles.cancelButtonText,
+                  { color: theme.textSecondary },
+                ]}
+              >
                 {cancelText}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.button, styles.confirmButton, { backgroundColor: getButtonColor() }]}
+              style={[
+                styles.button,
+                styles.confirmButton,
+                { backgroundColor: getButtonColor() },
+              ]}
               onPress={onConfirm}
               activeOpacity={0.7}
             >

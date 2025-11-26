@@ -53,7 +53,11 @@ export default function StockManagementScreen({ navigation }: any) {
   }, []);
 
   useEffect(() => {
-    console.log('[StockScreen] stockItems updated:', stockItems?.length || 0, 'items');
+    console.log(
+      '[StockScreen] stockItems updated:',
+      stockItems?.length || 0,
+      'items',
+    );
   }, [stockItems]);
 
   const enabledCategories = categories

@@ -128,18 +128,24 @@ export default function ClientListScreen({ navigation }: any) {
     setShowAddModal(true);
   };
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{visible: boolean; client: Client | null}>({visible: false, client: null});
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    visible: boolean;
+    client: Client | null;
+  }>({ visible: false, client: null });
 
   const handleDeleteClient = (client: Client) => {
-    setDeleteConfirm({visible: true, client});
+    setDeleteConfirm({ visible: true, client });
   };
 
   const confirmDelete = async () => {
     if (deleteConfirm.client) {
       await deleteClient(deleteConfirm.client.id);
-      showSuccessToast('Client Deleted', `${deleteConfirm.client.name} has been deleted`);
+      showSuccessToast(
+        'Client Deleted',
+        `${deleteConfirm.client.name} has been deleted`,
+      );
     }
-    setDeleteConfirm({visible: false, client: null});
+    setDeleteConfirm({ visible: false, client: null });
   };
 
   const resetForm = () => {
@@ -588,7 +594,7 @@ export default function ClientListScreen({ navigation }: any) {
         type="danger"
         icon="account-remove"
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirm({visible: false, client: null})}
+        onCancel={() => setDeleteConfirm({ visible: false, client: null })}
       />
     </View>
   );

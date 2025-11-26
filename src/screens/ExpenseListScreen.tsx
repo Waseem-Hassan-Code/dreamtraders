@@ -92,10 +92,13 @@ export default function ExpenseListScreen({ navigation }: any) {
     }
   };
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{visible: boolean; expense: Expense | null}>({visible: false, expense: null});
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    visible: boolean;
+    expense: Expense | null;
+  }>({ visible: false, expense: null });
 
   const handleDelete = (expense: Expense) => {
-    setDeleteConfirm({visible: true, expense});
+    setDeleteConfirm({ visible: true, expense });
   };
 
   const confirmDelete = async () => {
@@ -103,7 +106,7 @@ export default function ExpenseListScreen({ navigation }: any) {
       await deleteExpense(deleteConfirm.expense.id);
       showSuccessToast('Expense Deleted', 'Expense has been deleted');
     }
-    setDeleteConfirm({visible: false, expense: null});
+    setDeleteConfirm({ visible: false, expense: null });
   };
 
   const resetForm = () => {
@@ -375,13 +378,15 @@ export default function ExpenseListScreen({ navigation }: any) {
       <ConfirmDialog
         visible={deleteConfirm.visible}
         title="Delete Expense"
-        message={`Are you sure you want to delete this expense of ₹${deleteConfirm.expense?.amount?.toLocaleString() || ''}?`}
+        message={`Are you sure you want to delete this expense of ₹${
+          deleteConfirm.expense?.amount?.toLocaleString() || ''
+        }?`}
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
         icon="cash-remove"
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirm({visible: false, expense: null})}
+        onCancel={() => setDeleteConfirm({ visible: false, expense: null })}
       />
     </View>
   );
