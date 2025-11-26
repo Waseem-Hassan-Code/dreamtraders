@@ -16,7 +16,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { useStockStore } from '@/store/stockStore';
 import { useCategoryStore } from '@/store/categoryStore';
 import { StockItem, CategorySettings } from '@/types';
-import { generateId } from '@/utils/idGenerator';
+import { generateId, generateSequentialSKU } from '@/utils/idGenerator';
 import { showSuccessToast, showErrorToast } from '@/utils/toast';
 
 export default function StockManagementScreen({ navigation }: any) {
@@ -29,6 +29,11 @@ export default function StockManagementScreen({ navigation }: any) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+
+  // Add Stock Modal State
+  const [showAddStockModal, setShowAddStockModal] = useState(false);
+  const [addStockItem, setAddStockItem] = useState<StockItem | null>(null);
+  const [addStockQuantity, setAddStockQuantity] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -71,6 +76,15 @@ export default function StockManagementScreen({ navigation }: any) {
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  // Auto-generate SKU when opening modal for new item
+  const handleOpenAddModal = async () => {
+    resetForm();
+    // Generate new SKU for new items
+    const newSku = await generateSequentialSKU();
+    setFormData(prev => ({ ...prev, sku: newSku }));
+    setShowAddModal(true);
+  };
 
   const handleSaveStock = async () => {
     if (!formData.name.trim()) {
@@ -176,6 +190,45 @@ export default function StockManagementScreen({ navigation }: any) {
     setShowAddModal(true);
   };
 
+  const handleOpenAddStock = (item: StockItem) => {
+    setAddStockItem(item);
+    setAddStockQuantity('');
+    setShowAddStockModal(true);
+  };
+
+  const handleAddStockQuantity = async () => {
+    if (!addStockItem) return;
+
+    const qty = parseFloat(addStockQuantity);
+    if (!qty || qty <= 0) {
+      showErrorToast('Validation Error', 'Please enter a valid quantity');
+      return;
+    }
+
+    try {
+      const { stockRepository } = await import('@/database/repositories');
+      await stockRepository.updateQuantity(addStockItem.id, qty, {
+        stockItemId: addStockItem.id,
+        type: 'IN',
+        quantity: qty,
+        reason: 'Stock replenishment',
+        performedBy: 'system',
+      });
+
+      await loadStockItems('all');
+      setShowAddStockModal(false);
+      setAddStockItem(null);
+      setAddStockQuantity('');
+
+      showSuccessToast(
+        'Stock Added',
+        `Added ${qty} ${addStockItem.unit} to ${addStockItem.name}`,
+      );
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to add stock');
+    }
+  };
+
   const renderStockItem = ({ item }: { item: StockItem }) => {
     const isLowStock = item.currentQuantity <= item.minStockLevel;
     return (
@@ -203,24 +256,41 @@ export default function StockManagementScreen({ navigation }: any) {
               </View>
             )}
           </View>
-          <View
-            style={[
-              styles.stockBadge,
-              {
-                backgroundColor: isLowStock
-                  ? theme.danger + '20'
-                  : theme.success + '20',
-              },
-            ]}
-          >
-            <Text
+          <View style={styles.stockRightSection}>
+            <View
               style={[
-                styles.stockBadgeText,
-                { color: isLowStock ? theme.danger : theme.success },
+                styles.stockBadge,
+                {
+                  backgroundColor: isLowStock
+                    ? theme.danger + '20'
+                    : theme.success + '20',
+                },
               ]}
             >
-              {item.currentQuantity} {item.unit}
-            </Text>
+              <Text
+                style={[
+                  styles.stockBadgeText,
+                  { color: isLowStock ? theme.danger : theme.success },
+                ]}
+              >
+                {item.currentQuantity} {item.unit}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.addStockBtn,
+                { backgroundColor: theme.primary + '20' },
+              ]}
+              onPress={e => {
+                e.stopPropagation();
+                handleOpenAddStock(item);
+              }}
+            >
+              <Icon name="plus" size={16} color={theme.primary} />
+              <Text style={[styles.addStockBtnText, { color: theme.primary }]}>
+                Add
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -287,7 +357,7 @@ export default function StockManagementScreen({ navigation }: any) {
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           Stock Management
         </Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)}>
+        <TouchableOpacity onPress={handleOpenAddModal}>
           <Icon name="plus-circle" size={28} color={theme.primary} />
         </TouchableOpacity>
       </View>
@@ -374,7 +444,7 @@ export default function StockManagementScreen({ navigation }: any) {
             </Text>
             <TouchableOpacity
               style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-              onPress={() => setShowAddModal(true)}
+              onPress={handleOpenAddModal}
             >
               <Text style={styles.emptyButtonText}>Add Your First Item</Text>
             </TouchableOpacity>
@@ -537,24 +607,27 @@ export default function StockManagementScreen({ navigation }: any) {
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    SKU *
+                    SKU {!editingItem && '(Auto-generated)'}
                   </Text>
-                  <TextInput
+                  <View
                     style={[
                       styles.input,
+                      styles.skuInput,
                       {
-                        backgroundColor: theme.card,
-                        color: theme.text,
+                        backgroundColor: editingItem
+                          ? theme.card
+                          : theme.card + '80',
                         borderColor: theme.border,
                       },
                     ]}
-                    placeholder="Stock Keeping Unit"
-                    placeholderTextColor={theme.textTertiary}
-                    value={formData.sku}
-                    onChangeText={text =>
-                      setFormData({ ...formData, sku: text })
-                    }
-                  />
+                  >
+                    <Text style={{ color: theme.text, fontSize: 16 }}>
+                      {formData.sku || 'Generating...'}
+                    </Text>
+                    {!editingItem && (
+                      <Icon name="lock" size={16} color={theme.textTertiary} />
+                    )}
+                  </View>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: theme.textSecondary }]}>
@@ -788,6 +861,122 @@ export default function StockManagementScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Add Stock Quantity Modal */}
+      <Modal
+        visible={showAddStockModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowAddStockModal(false)}
+      >
+        <View style={styles.addStockModalOverlay}>
+          <View
+            style={[
+              styles.addStockModalContent,
+              { backgroundColor: theme.surface },
+            ]}
+          >
+            <View
+              style={[
+                styles.addStockModalHeader,
+                { borderBottomColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.addStockModalTitle, { color: theme.text }]}>
+                Add Stock
+              </Text>
+              <TouchableOpacity onPress={() => setShowAddStockModal(false)}>
+                <Icon name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.addStockModalBody}>
+              <Text style={[styles.addStockItemName, { color: theme.text }]}>
+                {addStockItem?.name}
+              </Text>
+              <Text
+                style={[styles.addStockItemSku, { color: theme.textSecondary }]}
+              >
+                SKU: {addStockItem?.sku}
+              </Text>
+
+              <View
+                style={[
+                  styles.currentStockRow,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.currentStockLabel,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Current Stock
+                </Text>
+                <Text style={[styles.currentStockValue, { color: theme.text }]}>
+                  {addStockItem?.currentQuantity} {addStockItem?.unit}
+                </Text>
+              </View>
+
+              <Text
+                style={[
+                  styles.label,
+                  { color: theme.textSecondary, marginTop: 16 },
+                ]}
+              >
+                Quantity to Add *
+              </Text>
+              <TextInput
+                style={[
+                  styles.addStockInput,
+                  {
+                    backgroundColor: theme.card,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="Enter quantity"
+                placeholderTextColor={theme.textTertiary}
+                keyboardType="decimal-pad"
+                value={addStockQuantity}
+                onChangeText={setAddStockQuantity}
+                autoFocus
+              />
+
+              <View style={styles.addStockModalFooter}>
+                <TouchableOpacity
+                  style={[
+                    styles.cancelButton,
+                    {
+                      backgroundColor: theme.card,
+                      borderColor: theme.border,
+                      flex: 1,
+                    },
+                  ]}
+                  onPress={() => setShowAddStockModal(false)}
+                >
+                  <Text
+                    style={[styles.cancelButtonText, { color: theme.text }]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    { backgroundColor: theme.success, flex: 1 },
+                  ]}
+                  onPress={handleAddStockQuantity}
+                >
+                  <Icon name="plus" size={20} color="#fff" />
+                  <Text style={styles.saveButtonText}>Add Stock</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -889,6 +1078,11 @@ const styles = StyleSheet.create({
   modalScroll: { padding: 20 },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 12 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16 },
+  skuInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   textArea: {
     borderWidth: 1,
     borderRadius: 8,
@@ -956,4 +1150,82 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  stockRightSection: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  addStockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  addStockBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addStockModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  addStockModalContent: {
+    width: '100%',
+    borderRadius: 16,
+    elevation: 5,
+  },
+  addStockModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  addStockModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  addStockModalBody: {
+    padding: 20,
+  },
+  addStockItemName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  addStockItemSku: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  currentStockRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  currentStockLabel: {
+    fontSize: 14,
+  },
+  currentStockValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  addStockInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 18,
+    textAlign: 'center',
+  },
+  addStockModalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
 });

@@ -1,6 +1,8 @@
 import { Invoice, IInvoiceRepository, Client, SaleItem } from '@/types';
 import database from '../index';
 import { generateUUID, generateInvoiceNumber } from '@/utils/idGenerator';
+import { clientRepository } from './ClientRepository';
+import { stockRepository } from './StockRepository';
 
 export class InvoiceRepository implements IInvoiceRepository {
   async getAll(): Promise<Invoice[]> {
@@ -45,6 +47,16 @@ export class InvoiceRepository implements IInvoiceRepository {
     return await this.mapRowsWithDetails(result.rows?._array || []);
   }
 
+  async getUnpaidByClientId(clientId: string): Promise<Invoice[]> {
+    const result = await database.execute(
+      `SELECT * FROM invoices 
+       WHERE client_id = ? AND status IN ('UNPAID', 'PARTIAL') 
+       ORDER BY created_at ASC`,
+      [clientId],
+    );
+    return await this.mapRowsWithDetails(result.rows?._array || []);
+  }
+
   async generateInvoiceNumber(): Promise<string> {
     return generateInvoiceNumber();
   }
@@ -79,7 +91,7 @@ export class InvoiceRepository implements IInvoiceRepository {
         ],
       );
 
-      // Insert invoice items
+      // Insert invoice items and deduct stock
       for (const item of data.items) {
         await database.execute(
           `INSERT INTO invoice_items (
@@ -94,6 +106,37 @@ export class InvoiceRepository implements IInvoiceRepository {
             item.quantity,
             item.unitPrice,
             item.total,
+          ],
+        );
+
+        // Deduct stock quantity
+        await stockRepository.updateQuantity(item.stockItemId, -item.quantity, {
+          type: 'OUT',
+          reason: `Sold via Invoice #${data.invoiceNumber}`,
+          referenceId: id,
+        });
+      }
+
+      // Update client balance (debit = amount due from this invoice)
+      if (data.amountDue > 0) {
+        await clientRepository.updateBalance(data.client.id, data.amountDue);
+
+        // Add ledger entry for the sale
+        await database.execute(
+          `INSERT INTO client_ledger (
+            id, client_id, date, type, description, debit, credit, balance, invoice_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            generateUUID(),
+            data.client.id,
+            now,
+            'SALE',
+            `Invoice #${data.invoiceNumber}`,
+            data.total,
+            data.amountPaid,
+            0, // Will be recalculated when fetched
+            id,
+            now,
           ],
         );
       }

@@ -31,3 +31,35 @@ export function generateSKU(categoryName: string, itemName: string): string {
     .padStart(5, '0');
   return `${catPrefix}${itemPrefix}${random}`;
 }
+
+// Generate sequential SKU in format "item_0001"
+export async function generateSequentialSKU(): Promise<string> {
+  try {
+    const database = (await import('@/database')).default;
+    const result = await database.execute(
+      "SELECT sku FROM stock_items WHERE sku LIKE 'item_%' ORDER BY sku DESC LIMIT 1",
+    );
+
+    const rows = Array.isArray(result?.rows)
+      ? result.rows
+      : result?.rows?._array || [];
+
+    let nextNumber = 1;
+    if (rows.length > 0) {
+      const lastSku = rows[0].sku;
+      const match = lastSku.match(/item_(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    return `item_${nextNumber.toString().padStart(4, '0')}`;
+  } catch (error) {
+    console.error('Error generating sequential SKU:', error);
+    // Fallback to random SKU if database query fails
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0');
+    return `item_${random}`;
+  }
+}

@@ -80,6 +80,7 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
       quantity: 1,
       unitPrice: item.salePrice,
       total: item.salePrice,
+      availableQuantity: item.currentQuantity, // Track available quantity
     };
 
     setInvoiceItems([...invoiceItems, newItem]);
@@ -89,6 +90,20 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
   const updateItemQuantity = (index: number, quantity: number) => {
     const newItems = [...invoiceItems];
     const item = newItems[index];
+
+    // Get available stock for this item
+    const stockItem = stockItems.find(s => s.id === item.stockItemId);
+    const availableQty = stockItem?.currentQuantity || 0;
+
+    // Validate quantity against available stock
+    if (quantity > availableQty) {
+      showErrorToast(
+        'Insufficient Stock',
+        `Only ${availableQty} ${stockItem?.unit || 'units'} available`,
+      );
+      return;
+    }
+
     item.quantity = quantity;
     item.total = quantity * item.unitPrice;
     setInvoiceItems(newItems);
@@ -131,6 +146,22 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
       return;
     }
 
+    // Validate stock availability for all items
+    for (const item of invoiceItems) {
+      const stockItem = stockItems.find(s => s.id === item.stockItemId);
+      if (!stockItem) {
+        showErrorToast('Error', `Stock item ${item.stockItemName} not found`);
+        return;
+      }
+      if (item.quantity > stockItem.currentQuantity) {
+        showErrorToast(
+          'Insufficient Stock',
+          `Only ${stockItem.currentQuantity} ${stockItem.unit} of ${item.stockItemName} available`,
+        );
+        return;
+      }
+    }
+
     try {
       await createInvoice({
         invoiceNumber,
@@ -146,6 +177,9 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
         status: due <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID',
         notes,
       });
+
+      // Reload stock to reflect deductions
+      loadStockItems('all');
 
       showSuccessToast(
         'Invoice Created',
@@ -256,73 +290,106 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
 
-        {invoiceItems.map((item, index) => (
-          <View
-            key={index}
-            style={[
-              styles.itemCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <View style={styles.itemHeader}>
-              <Text style={[styles.itemName, { color: theme.text }]}>
-                {item.stockItemName}
-              </Text>
-              <TouchableOpacity onPress={() => removeItem(index)}>
-                <Icon name="close-circle" size={20} color={theme.danger} />
-              </TouchableOpacity>
-            </View>
+        {invoiceItems.map((item, index) => {
+          const stockItem = stockItems.find(s => s.id === item.stockItemId);
+          const availableQty = stockItem?.currentQuantity || 0;
+          const isOverStock = item.quantity > availableQty;
 
-            <View style={styles.itemControls}>
-              <View style={styles.controlGroup}>
-                <Text
-                  style={[styles.controlLabel, { color: theme.textSecondary }]}
-                >
-                  Qty
-                </Text>
-                <TextInput
-                  style={[
-                    styles.smallInput,
-                    { color: theme.text, borderColor: theme.border },
-                  ]}
-                  keyboardType="decimal-pad"
-                  value={item.quantity.toString()}
-                  onChangeText={text =>
-                    updateItemQuantity(index, parseFloat(text) || 0)
-                  }
-                />
+          return (
+            <View
+              key={index}
+              style={[
+                styles.itemCard,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: isOverStock ? theme.danger : theme.border,
+                },
+              ]}
+            >
+              <View style={styles.itemHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemName, { color: theme.text }]}>
+                    {item.stockItemName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.stockInfo,
+                      {
+                        color: isOverStock ? theme.danger : theme.textTertiary,
+                      },
+                    ]}
+                  >
+                    Available: {availableQty} {stockItem?.unit || 'pcs'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => removeItem(index)}>
+                  <Icon name="close-circle" size={20} color={theme.danger} />
+                </TouchableOpacity>
               </View>
-              <View style={styles.controlGroup}>
-                <Text
-                  style={[styles.controlLabel, { color: theme.textSecondary }]}
-                >
-                  Price
-                </Text>
-                <TextInput
-                  style={[
-                    styles.smallInput,
-                    { color: theme.text, borderColor: theme.border },
-                  ]}
-                  keyboardType="decimal-pad"
-                  value={item.unitPrice.toString()}
-                  onChangeText={text =>
-                    updateItemPrice(index, parseFloat(text) || 0)
-                  }
-                />
-              </View>
-              <View style={styles.controlGroup}>
-                <Text
-                  style={[styles.controlLabel, { color: theme.textSecondary }]}
-                >
-                  Total
-                </Text>
-                <Text style={[styles.itemTotal, { color: theme.text }]}>
-                  {item.total.toLocaleString()}
-                </Text>
+
+              <View style={styles.itemControls}>
+                <View style={styles.controlGroup}>
+                  <Text
+                    style={[
+                      styles.controlLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Qty
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.smallInput,
+                      {
+                        color: isOverStock ? theme.danger : theme.text,
+                        borderColor: isOverStock ? theme.danger : theme.border,
+                      },
+                    ]}
+                    keyboardType="decimal-pad"
+                    value={item.quantity.toString()}
+                    onChangeText={text =>
+                      updateItemQuantity(index, parseFloat(text) || 0)
+                    }
+                  />
+                </View>
+                <View style={styles.controlGroup}>
+                  <Text
+                    style={[
+                      styles.controlLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Price
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.smallInput,
+                      { color: theme.text, borderColor: theme.border },
+                    ]}
+                    keyboardType="decimal-pad"
+                    value={item.unitPrice.toString()}
+                    onChangeText={text =>
+                      updateItemPrice(index, parseFloat(text) || 0)
+                    }
+                  />
+                </View>
+                <View style={styles.controlGroup}>
+                  <Text
+                    style={[
+                      styles.controlLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Total
+                  </Text>
+                  <Text style={[styles.itemTotal, { color: theme.text }]}>
+                    {item.total.toLocaleString()}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         {/* Summary */}
         <View
@@ -509,29 +576,83 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           <FlatList
             data={filteredStock}
             keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.listItem, { borderBottomColor: theme.border }]}
-                onPress={() => addItemToInvoice(item)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.listItemTitle, { color: theme.text }]}>
-                    {item.name}
-                  </Text>
+            renderItem={({ item }) => {
+              const isOutOfStock = item.currentQuantity <= 0;
+              const isLowStock =
+                item.currentQuantity <= item.minStockLevel &&
+                item.currentQuantity > 0;
+
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.listItem,
+                    {
+                      borderBottomColor: theme.border,
+                      opacity: isOutOfStock ? 0.5 : 1,
+                    },
+                  ]}
+                  onPress={() => addItemToInvoice(item)}
+                  disabled={isOutOfStock}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.listItemTitle, { color: theme.text }]}>
+                      {item.name}
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 4,
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.stockBadge,
+                          {
+                            backgroundColor: isOutOfStock
+                              ? theme.danger + '20'
+                              : isLowStock
+                              ? theme.warning + '20'
+                              : theme.success + '20',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.stockBadgeText,
+                            {
+                              color: isOutOfStock
+                                ? theme.danger
+                                : isLowStock
+                                ? theme.warning
+                                : theme.success,
+                            },
+                          ]}
+                        >
+                          {isOutOfStock
+                            ? 'Out of Stock'
+                            : `${item.currentQuantity} ${item.unit}`}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.listItemSubtitle,
+                          { color: theme.textTertiary },
+                        ]}
+                      >
+                        SKU: {item.sku}
+                      </Text>
+                    </View>
+                  </View>
                   <Text
-                    style={[
-                      styles.listItemSubtitle,
-                      { color: theme.textSecondary },
-                    ]}
+                    style={[styles.listItemPrice, { color: theme.primary }]}
                   >
-                    Stock: {item.currentQuantity} {item.unit}
+                    PKR {item.salePrice}
                   </Text>
-                </View>
-                <Text style={[styles.listItemPrice, { color: theme.primary }]}>
-                  {item.salePrice}
-                </Text>
-              </TouchableOpacity>
-            )}
+                </TouchableOpacity>
+              );
+            }}
           />
         </View>
       </Modal>
@@ -588,6 +709,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemName: { fontSize: 16, fontWeight: '600' },
+  stockInfo: { fontSize: 12, marginTop: 2 },
   itemControls: { flexDirection: 'row', gap: 12 },
   controlGroup: { flex: 1 },
   controlLabel: { fontSize: 12, marginBottom: 4 },
@@ -642,6 +764,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listItemTitle: { fontSize: 16, fontWeight: '600' },
-  listItemSubtitle: { fontSize: 14, marginTop: 4 },
+  listItemSubtitle: { fontSize: 12 },
   listItemPrice: { fontSize: 16, fontWeight: 'bold' },
+  stockBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  stockBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

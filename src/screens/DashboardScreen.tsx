@@ -15,6 +15,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useStockStore } from '@/store/stockStore';
 import { useClientStore } from '@/store/clientStore';
 import { useThemeStore } from '@/store/themeStore';
+import { useInvoiceStore } from '@/store/invoiceStore';
+import { useExpenseStore } from '@/store/expenseStore';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +25,8 @@ export default function DashboardScreen({ navigation }: any) {
     useStockStore();
   const { clients, loadClients } = useClientStore();
   const { theme, isDark, toggleTheme } = useThemeStore();
+  const { invoices, loadInvoices } = useInvoiceStore();
+  const { expenses, loadExpenses } = useExpenseStore();
 
   const [stockValue, setStockValue] = useState({
     purchaseValue: 0,
@@ -31,6 +35,12 @@ export default function DashboardScreen({ navigation }: any) {
   const [categoryValues, setCategoryValues] = useState<
     { categoryId: string; value: number }[]
   >([]);
+  const [weeklySales, setWeeklySales] = useState<number[]>([
+    0, 0, 0, 0, 0, 0, 0,
+  ]);
+  const [expensesByCategory, setExpensesByCategory] = useState<
+    { label: string; value: number }[]
+  >([]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -38,9 +48,51 @@ export default function DashboardScreen({ navigation }: any) {
       loadClients();
       loadStockItems('all');
       loadStockStats();
+      loadInvoices();
+      loadExpenses();
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Calculate weekly sales from invoices
+  useEffect(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const dailySales = [0, 0, 0, 0, 0, 0, 0]; // Sun, Mon, Tue, Wed, Thu, Fri, Sat
+
+    invoices.forEach(invoice => {
+      const invoiceDate = new Date(invoice.createdAt);
+      if (invoiceDate >= weekStart) {
+        const day = invoiceDate.getDay();
+        dailySales[day] += invoice.total;
+      }
+    });
+
+    // Reorder to Mon-Sun format
+    setWeeklySales([...dailySales.slice(1), dailySales[0]]);
+  }, [invoices]);
+
+  // Calculate expenses by category
+  useEffect(() => {
+    const categoryTotals: { [key: string]: number } = {};
+
+    expenses.forEach(expense => {
+      const categoryName = expense.category?.name || 'Misc';
+      categoryTotals[categoryName] =
+        (categoryTotals[categoryName] || 0) + expense.amount;
+    });
+
+    const expenseData = Object.entries(categoryTotals)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4); // Top 4 categories
+
+    setExpensesByCategory(expenseData);
+  }, [expenses]);
 
   const loadStockStats = async () => {
     try {
@@ -61,21 +113,29 @@ export default function DashboardScreen({ navigation }: any) {
   );
   const lowStockCount = lowStockItems.length;
 
-  // Sample data for charts - replace with real data later
+  // Real sales data for the week
   const salesData = {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
-        data: [2000, 4500, 2800, 8000, 9900, 4300, 6000],
+        data: weeklySales.map(v => v || 0),
         color: (opacity = 1) => `rgba(14, 165, 233, ${opacity})`,
         strokeWidth: 3,
       },
     ],
   };
 
+  // Real expense data by category
+  const expenseLabels =
+    expensesByCategory.length > 0
+      ? expensesByCategory.map(e => e.label)
+      : ['No Data'];
+  const expenseValues =
+    expensesByCategory.length > 0 ? expensesByCategory.map(e => e.value) : [0];
+
   const expenseData = {
-    labels: ['Food', 'Petrol', 'Bills', 'Misc'],
-    datasets: [{ data: [1200, 800, 1500, 600] }],
+    labels: expenseLabels,
+    datasets: [{ data: expenseValues }],
   };
 
   // Load categories for display
@@ -160,7 +220,9 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={[styles.headerTitle, { color: theme.text }]}>
               Dream Traders
             </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.textTertiary }]}>
+            <Text
+              style={[styles.headerSubtitle, { color: theme.textTertiary }]}
+            >
               Welcome back! 👋
             </Text>
           </View>
@@ -346,8 +408,6 @@ export default function DashboardScreen({ navigation }: any) {
             style={styles.chart}
           />
         </View>
-
-
 
         <View style={{ height: 20 }} />
       </ScrollView>
