@@ -35,8 +35,8 @@ export default function DashboardScreen({ navigation }: any) {
   const [categoryValues, setCategoryValues] = useState<
     { categoryId: string; value: number }[]
   >([]);
-  const [weeklySales, setWeeklySales] = useState<number[]>([
-    0, 0, 0, 0, 0, 0, 0,
+  const [monthlySales, setMonthlySales] = useState<number[]>([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ]);
   const [expensesByCategory, setExpensesByCategory] = useState<
     { label: string; value: number }[]
@@ -54,26 +54,22 @@ export default function DashboardScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation]);
 
-  // Calculate weekly sales from invoices
+  // Calculate monthly sales from invoices (current year)
   useEffect(() => {
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Sunday
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - dayOfWeek);
-    weekStart.setHours(0, 0, 0, 0);
+    const currentYear = now.getFullYear();
 
-    const dailySales = [0, 0, 0, 0, 0, 0, 0]; // Sun, Mon, Tue, Wed, Thu, Fri, Sat
+    const monthSales = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan to Dec
 
     invoices.forEach(invoice => {
       const invoiceDate = new Date(invoice.createdAt);
-      if (invoiceDate >= weekStart) {
-        const day = invoiceDate.getDay();
-        dailySales[day] += invoice.total;
+      if (invoiceDate.getFullYear() === currentYear) {
+        const month = invoiceDate.getMonth(); // 0 = January
+        monthSales[month] += invoice.total;
       }
     });
 
-    // Reorder to Mon-Sun format
-    setWeeklySales([...dailySales.slice(1), dailySales[0]]);
+    setMonthlySales(monthSales);
   }, [invoices]);
 
   // Calculate expenses by category
@@ -113,12 +109,25 @@ export default function DashboardScreen({ navigation }: any) {
   );
   const lowStockCount = lowStockItems.length;
 
-  // Real sales data for the week
+  // Real sales data for the year (monthly)
   const salesData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    labels: [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ],
     datasets: [
       {
-        data: weeklySales.map(v => v || 0),
+        data: monthlySales.map(v => v || 0),
         color: (opacity = 1) => `rgba(14, 165, 233, ${opacity})`,
         strokeWidth: 3,
       },
@@ -335,13 +344,13 @@ export default function DashboardScreen({ navigation }: any) {
           <View style={styles.chartHeader}>
             <Icon name="chart-line-variant" size={24} color={theme.primary} />
             <Text style={[styles.chartTitle, { color: theme.text }]}>
-              Sales Overview
+              Monthly Sales Overview
             </Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <LineChart
               data={salesData}
-              width={width - 48}
+              width={width * 1.5}
               height={220}
               chartConfig={chartConfig}
               bezier
@@ -371,7 +380,7 @@ export default function DashboardScreen({ navigation }: any) {
             data={expenseData}
             width={width - 48}
             height={220}
-            yAxisLabel="₹"
+            yAxisLabel="PKR "
             yAxisSuffix=""
             chartConfig={{
               ...chartConfig,
