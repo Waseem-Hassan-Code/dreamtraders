@@ -9,22 +9,29 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemeStore } from '@/store/themeStore';
 import { useInvoiceStore } from '@/store/invoiceStore';
+import { useClientStore } from '@/store/clientStore';
 import { Invoice } from '@/types';
+import { generateAndShareInvoicePDF } from '@/utils/pdfGenerator';
+import { showSuccessToast, showErrorToast } from '@/utils/toast';
 
 export default function InvoiceListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
   const { invoices, loadInvoices } = useInvoiceStore();
+  const { clients, loadClients } = useClientStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadInvoices();
+      loadClients();
     });
     return unsubscribe;
   }, [navigation]);
@@ -41,6 +48,40 @@ export default function InvoiceListScreen({ navigation }: any) {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const handleGeneratePDF = async (includeLedger: boolean = false) => {
+    if (!selectedInvoice) return;
+
+    const client = clients.find(c => c.id === selectedInvoice.clientId);
+    if (!client) {
+      showErrorToast('Error', 'Client information not found');
+      return;
+    }
+
+    setGeneratingPDF(true);
+    try {
+      // Get ledger entries if needed
+      let ledgerEntries: any[] = [];
+      if (includeLedger) {
+        const { clientRepository } = await import('@/database/repositories');
+        ledgerEntries = await clientRepository.getLedger(client.id);
+      }
+
+      await generateAndShareInvoicePDF({
+        invoice: selectedInvoice,
+        client,
+        ledgerEntries,
+        includeLedger,
+      });
+      showSuccessToast('Success', 'PDF generated and ready to share');
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        showErrorToast('Error', error.message || 'Failed to generate PDF');
+      }
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const renderInvoice = ({ item }: { item: Invoice }) => (
@@ -424,6 +465,60 @@ export default function InvoiceListScreen({ navigation }: any) {
                 </View>
               </View>
 
+              {/* PDF Generation Buttons */}
+              <View
+                style={[styles.pdfSection, { borderTopColor: theme.border }]}
+              >
+                <Text
+                  style={[
+                    styles.pdfSectionTitle,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Share Invoice
+                </Text>
+                <View style={styles.pdfButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.pdfButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                    onPress={() => handleGeneratePDF(false)}
+                    disabled={generatingPDF}
+                  >
+                    {generatingPDF ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Icon name="file-pdf-box" size={20} color="#fff" />
+                        <Text style={styles.pdfButtonText}>Invoice Only</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.pdfButton,
+                      { backgroundColor: theme.success },
+                    ]}
+                    onPress={() => handleGeneratePDF(true)}
+                    disabled={generatingPDF}
+                  >
+                    {generatingPDF ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Icon
+                          name="file-document-multiple"
+                          size={20}
+                          color="#fff"
+                        />
+                        <Text style={styles.pdfButtonText}>With Ledger</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               <View style={{ height: 20 }} />
             </ScrollView>
           </View>
@@ -624,6 +719,36 @@ const styles = StyleSheet.create({
   },
   statusTextLarge: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  pdfSection: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+  },
+  pdfSectionTitle: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  pdfButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pdfButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  pdfButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

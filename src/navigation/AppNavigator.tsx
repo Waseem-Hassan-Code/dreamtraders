@@ -15,6 +15,7 @@ import ReportsScreen from '../screens/ReportsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ClientDetailsScreen from '../screens/ClientDetailsScreen';
 import InvoiceCreateScreen from '../screens/InvoiceCreateScreen';
+import MonthlyEarningsScreen from '../screens/MonthlyEarningsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -118,6 +119,10 @@ export default function AppNavigator() {
         <Stack.Screen name="Reports" component={ReportsScreen} />
         <Stack.Screen name="ClientDetails" component={ClientDetailsScreen} />
         <Stack.Screen name="CreateInvoice" component={InvoiceCreateScreen} />
+        <Stack.Screen
+          name="MonthlyEarnings"
+          component={MonthlyEarningsScreen}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

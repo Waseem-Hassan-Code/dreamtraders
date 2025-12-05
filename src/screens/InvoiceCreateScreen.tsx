@@ -505,17 +505,32 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           style={[styles.modalContainer, { backgroundColor: theme.background }]}
         >
           <View
-            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+            style={[
+              styles.modalHeader,
+              {
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.border,
+              },
+            ]}
           >
-            <TouchableOpacity onPress={() => setShowClientModal(false)}>
-              <Icon name="close" size={24} color={theme.text} />
+            <TouchableOpacity
+              style={[styles.modalCloseBtn, { backgroundColor: theme.card }]}
+              onPress={() => setShowClientModal(false)}
+            >
+              <Icon name="close" size={20} color={theme.text} />
             </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Select Client
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <View
+            style={[styles.searchContainer, { backgroundColor: theme.surface }]}
+          >
+            <Icon name="magnify" size={20} color={theme.textTertiary} />
             <TextInput
-              style={[
-                styles.modalSearch,
-                { color: theme.text, backgroundColor: theme.card },
-              ]}
-              placeholder="Search Clients..."
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search by name or shop..."
               placeholderTextColor={theme.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -525,27 +540,89 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           <FlatList
             data={filteredClients}
             keyExtractor={item => item.id}
+            contentContainerStyle={styles.clientListContent}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.listItem, { borderBottomColor: theme.border }]}
+                style={[
+                  styles.clientCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                ]}
                 onPress={() => {
                   setSelectedClient(item);
                   setShowClientModal(false);
                 }}
               >
-                <Text style={[styles.listItemTitle, { color: theme.text }]}>
-                  {item.name}
-                </Text>
-                <Text
+                <View
                   style={[
-                    styles.listItemSubtitle,
-                    { color: theme.textSecondary },
+                    styles.clientAvatar,
+                    { backgroundColor: theme.primary + '20' },
                   ]}
                 >
-                  {item.shopName}
-                </Text>
+                  <Icon name="account" size={24} color={theme.primary} />
+                </View>
+                <View style={styles.clientInfo}>
+                  <Text style={[styles.clientName, { color: theme.text }]}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    style={[styles.clientShop, { color: theme.textSecondary }]}
+                  >
+                    {item.shopName}
+                  </Text>
+                  {item.area && (
+                    <View style={styles.clientAreaRow}>
+                      <Icon
+                        name="map-marker"
+                        size={12}
+                        color={theme.textTertiary}
+                      />
+                      <Text
+                        style={[
+                          styles.clientArea,
+                          { color: theme.textTertiary },
+                        ]}
+                      >
+                        {item.area}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.clientBalanceContainer}>
+                  <Text
+                    style={[
+                      styles.clientBalanceLabel,
+                      { color: theme.textTertiary },
+                    ]}
+                  >
+                    Balance
+                  </Text>
+                  <Text
+                    style={[
+                      styles.clientBalance,
+                      {
+                        color: item.balance > 0 ? theme.danger : theme.success,
+                      },
+                    ]}
+                  >
+                    PKR {item.balance.toLocaleString()}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
+            ListEmptyComponent={
+              <View style={styles.emptyList}>
+                <Icon
+                  name="account-search"
+                  size={48}
+                  color={theme.textTertiary}
+                />
+                <Text
+                  style={[styles.emptyText, { color: theme.textSecondary }]}
+                >
+                  No clients found
+                </Text>
+              </View>
+            }
           />
         </View>
       </Modal>
@@ -556,17 +633,32 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           style={[styles.modalContainer, { backgroundColor: theme.background }]}
         >
           <View
-            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+            style={[
+              styles.modalHeader,
+              {
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.border,
+              },
+            ]}
           >
-            <TouchableOpacity onPress={() => setShowItemModal(false)}>
-              <Icon name="close" size={24} color={theme.text} />
+            <TouchableOpacity
+              style={[styles.modalCloseBtn, { backgroundColor: theme.card }]}
+              onPress={() => setShowItemModal(false)}
+            >
+              <Icon name="close" size={20} color={theme.text} />
             </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Select Item
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <View
+            style={[styles.searchContainer, { backgroundColor: theme.surface }]}
+          >
+            <Icon name="magnify" size={20} color={theme.textTertiary} />
             <TextInput
-              style={[
-                styles.modalSearch,
-                { color: theme.text, backgroundColor: theme.card },
-              ]}
-              placeholder="Search Items..."
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search by name or SKU..."
               placeholderTextColor={theme.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -576,83 +668,146 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           <FlatList
             data={filteredStock}
             keyExtractor={item => item.id}
+            contentContainerStyle={styles.stockListContent}
             renderItem={({ item }) => {
               const isOutOfStock = item.currentQuantity <= 0;
               const isLowStock =
                 item.currentQuantity <= item.minStockLevel &&
                 item.currentQuantity > 0;
+              const margin = item.salePrice - item.purchasePrice;
+              const marginPercent = (
+                (margin / item.purchasePrice) *
+                100
+              ).toFixed(0);
 
               return (
                 <TouchableOpacity
                   style={[
-                    styles.listItem,
+                    styles.stockCard,
                     {
-                      borderBottomColor: theme.border,
-                      opacity: isOutOfStock ? 0.5 : 1,
+                      backgroundColor: theme.card,
+                      borderColor: isOutOfStock
+                        ? theme.danger + '50'
+                        : theme.border,
+                      opacity: isOutOfStock ? 0.6 : 1,
                     },
                   ]}
                   onPress={() => addItemToInvoice(item)}
                   disabled={isOutOfStock}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.listItemTitle, { color: theme.text }]}>
-                      {item.name}
-                    </Text>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                        marginTop: 4,
-                      }}
-                    >
-                      <View
-                        style={[
-                          styles.stockBadge,
-                          {
-                            backgroundColor: isOutOfStock
-                              ? theme.danger + '20'
-                              : isLowStock
-                              ? theme.warning + '20'
-                              : theme.success + '20',
-                          },
-                        ]}
+                  <View style={styles.stockCardHeader}>
+                    <View style={styles.stockCardLeft}>
+                      <Text
+                        style={[styles.stockItemName, { color: theme.text }]}
                       >
-                        <Text
-                          style={[
-                            styles.stockBadgeText,
-                            {
-                              color: isOutOfStock
-                                ? theme.danger
-                                : isLowStock
-                                ? theme.warning
-                                : theme.success,
-                            },
-                          ]}
-                        >
-                          {isOutOfStock
-                            ? 'Out of Stock'
-                            : `${item.currentQuantity} ${item.unit}`}
-                        </Text>
-                      </View>
+                        {item.name}
+                      </Text>
                       <Text
                         style={[
-                          styles.listItemSubtitle,
+                          styles.stockItemSku,
                           { color: theme.textTertiary },
                         ]}
                       >
                         SKU: {item.sku}
                       </Text>
                     </View>
+                    <View
+                      style={[
+                        styles.stockQtyBadge,
+                        {
+                          backgroundColor: isOutOfStock
+                            ? theme.danger + '20'
+                            : isLowStock
+                            ? theme.warning + '20'
+                            : theme.success + '20',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.stockQtyText,
+                          {
+                            color: isOutOfStock
+                              ? theme.danger
+                              : isLowStock
+                              ? theme.warning
+                              : theme.success,
+                          },
+                        ]}
+                      >
+                        {isOutOfStock
+                          ? 'Out of Stock'
+                          : `${item.currentQuantity} ${item.unit}`}
+                      </Text>
+                    </View>
                   </View>
-                  <Text
-                    style={[styles.listItemPrice, { color: theme.primary }]}
-                  >
-                    PKR {item.salePrice}
-                  </Text>
+                  <View style={styles.stockCardPrices}>
+                    <View style={styles.priceItem}>
+                      <Text
+                        style={[
+                          styles.priceLabel,
+                          { color: theme.textTertiary },
+                        ]}
+                      >
+                        Purchase
+                      </Text>
+                      <Text
+                        style={[
+                          styles.priceValue,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        PKR {item.purchasePrice}
+                      </Text>
+                    </View>
+                    <View style={styles.priceItem}>
+                      <Text
+                        style={[
+                          styles.priceLabel,
+                          { color: theme.textTertiary },
+                        ]}
+                      >
+                        Sale
+                      </Text>
+                      <Text
+                        style={[styles.priceValue, { color: theme.primary }]}
+                      >
+                        PKR {item.salePrice}
+                      </Text>
+                    </View>
+                    <View style={styles.priceItem}>
+                      <Text
+                        style={[
+                          styles.priceLabel,
+                          { color: theme.textTertiary },
+                        ]}
+                      >
+                        Margin
+                      </Text>
+                      <Text
+                        style={[styles.priceValue, { color: theme.success }]}
+                      >
+                        {marginPercent}%
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
             }}
+            ListEmptyComponent={
+              <View style={styles.emptyList}>
+                <Icon
+                  name="package-variant"
+                  size={48}
+                  color={theme.textTertiary}
+                />
+                <Text
+                  style={[styles.emptyText, { color: theme.textSecondary }]}
+                >
+                  No items found
+                </Text>
+              </View>
+            }
           />
         </View>
       </Modal>
@@ -754,6 +909,147 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     padding: 8,
+    fontSize: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  clientListContent: {
+    padding: 16,
+  },
+  clientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  clientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  clientShop: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  clientAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  clientArea: {
+    fontSize: 12,
+  },
+  clientBalanceContainer: {
+    alignItems: 'flex-end',
+  },
+  clientBalanceLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  clientBalance: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  stockListContent: {
+    padding: 16,
+  },
+  stockCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  stockCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  stockCardLeft: {
+    flex: 1,
+  },
+  stockItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  stockItemSku: {
+    fontSize: 12,
+  },
+  stockQtyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  stockQtyText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stockCardPrices: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  priceItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyList: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 12,
     fontSize: 16,
   },
   listItem: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
-  Switch,
   Image,
 } from 'react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
@@ -24,7 +23,7 @@ export default function DashboardScreen({ navigation }: any) {
   const { lowStockItems, loadLowStockItems, stockItems, loadStockItems } =
     useStockStore();
   const { clients, loadClients } = useClientStore();
-  const { theme, isDark, toggleTheme } = useThemeStore();
+  const { theme, isDark } = useThemeStore();
   const { invoices, loadInvoices } = useInvoiceStore();
   const { expenses, loadExpenses } = useExpenseStore();
 
@@ -36,6 +35,9 @@ export default function DashboardScreen({ navigation }: any) {
     { categoryId: string; value: number }[]
   >([]);
   const [monthlySales, setMonthlySales] = useState<number[]>([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ]);
+  const [monthlyExpenses, setMonthlyExpenses] = useState<number[]>([
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   ]);
   const [expensesByCategory, setExpensesByCategory] = useState<
@@ -72,6 +74,24 @@ export default function DashboardScreen({ navigation }: any) {
     setMonthlySales(monthSales);
   }, [invoices]);
 
+  // Calculate monthly expenses (current year)
+  useEffect(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    const monthExp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    expenses.forEach(expense => {
+      const expenseDate = new Date(expense.date);
+      if (expenseDate.getFullYear() === currentYear) {
+        const month = expenseDate.getMonth();
+        monthExp[month] += expense.amount;
+      }
+    });
+
+    setMonthlyExpenses(monthExp);
+  }, [expenses]);
+
   // Calculate expenses by category
   useEffect(() => {
     const categoryTotals: { [key: string]: number } = {};
@@ -89,6 +109,26 @@ export default function DashboardScreen({ navigation }: any) {
 
     setExpensesByCategory(expenseData);
   }, [expenses]);
+
+  // Calculate net earnings (sales - expenses) per month
+  const monthlyEarnings = useMemo(() => {
+    return monthlySales.map((sale, index) => sale - monthlyExpenses[index]);
+  }, [monthlySales, monthlyExpenses]);
+
+  // Calculate total margin from stock (sale price - purchase price)
+  const totalMargin = useMemo(() => {
+    return stockItems.reduce((total, item) => {
+      const margin =
+        (item.salePrice - item.purchasePrice) * item.currentQuantity;
+      return total + margin;
+    }, 0);
+  }, [stockItems]);
+
+  // Calculate current month earnings
+  const currentMonthEarnings = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    return monthlyEarnings[currentMonth] || 0;
+  }, [monthlyEarnings]);
 
   const loadStockStats = async () => {
     try {
@@ -237,17 +277,12 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <Icon
-            name={isDark ? 'weather-night' : 'weather-sunny'}
-            size={24}
-            color={theme.textSecondary}
-          />
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: '#cbd5e1', true: theme.primary }}
-            thumbColor="#ffffff"
-          />
+          <TouchableOpacity
+            style={[styles.settingsBtn, { backgroundColor: theme.card }]}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <Icon name="cog" size={22} color={theme.textSecondary} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -255,6 +290,87 @@ export default function DashboardScreen({ navigation }: any) {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
+        {/* Earnings Summary Card */}
+        <View
+          style={[
+            styles.earningsCard,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <View style={styles.earningsHeader}>
+            <Icon name="chart-line" size={24} color={theme.success} />
+            <Text style={[styles.earningsTitle, { color: theme.text }]}>
+              This Month's Performance
+            </Text>
+          </View>
+          <View style={styles.earningsRow}>
+            <View style={styles.earningsItem}>
+              <Text
+                style={[styles.earningsLabel, { color: theme.textSecondary }]}
+              >
+                Sales
+              </Text>
+              <Text style={[styles.earningsValue, { color: theme.success }]}>
+                PKR {monthlySales[new Date().getMonth()].toLocaleString()}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.earningsDivider,
+                { backgroundColor: theme.border },
+              ]}
+            />
+            <View style={styles.earningsItem}>
+              <Text
+                style={[styles.earningsLabel, { color: theme.textSecondary }]}
+              >
+                Expenses
+              </Text>
+              <Text style={[styles.earningsValue, { color: theme.danger }]}>
+                PKR {monthlyExpenses[new Date().getMonth()].toLocaleString()}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.earningsDivider,
+                { backgroundColor: theme.border },
+              ]}
+            />
+            <View style={styles.earningsItem}>
+              <Text
+                style={[styles.earningsLabel, { color: theme.textSecondary }]}
+              >
+                Net Profit
+              </Text>
+              <Text
+                style={[
+                  styles.earningsValue,
+                  {
+                    color:
+                      currentMonthEarnings >= 0 ? theme.success : theme.danger,
+                  },
+                ]}
+              >
+                PKR {currentMonthEarnings.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.viewEarningsBtn,
+              { backgroundColor: theme.primary + '15' },
+            ]}
+            onPress={() => navigation.navigate('MonthlyEarnings')}
+          >
+            <Text
+              style={[styles.viewEarningsBtnText, { color: theme.primary }]}
+            >
+              View Detailed Earnings
+            </Text>
+            <Icon name="chevron-right" size={18} color={theme.primary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <StatCard
@@ -279,10 +395,10 @@ export default function DashboardScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Reports')}
           />
           <StatCard
-            icon="alert-circle"
-            value={lowStockCount}
-            label="Low Stock"
-            color={theme.danger}
+            icon="trending-up"
+            value={`PKR ${(totalMargin / 1000).toFixed(0)}K`}
+            label="Total Margin"
+            color="#8b5cf6"
             onPress={() => navigation.navigate('StockManagement')}
           />
         </View>
@@ -499,6 +615,64 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 13,
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  earningsCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 2,
+  },
+  earningsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  earningsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  earningsItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  earningsLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  earningsValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  earningsDivider: {
+    width: 1,
+    height: 40,
+  },
+  viewEarningsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  viewEarningsBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   alertSection: {
     margin: 16,

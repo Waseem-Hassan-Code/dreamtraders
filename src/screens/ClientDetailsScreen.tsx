@@ -222,9 +222,18 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         type: 'PAYMENT',
         selectedInvoiceId: '',
       });
+
+      // Refresh data in sequence to ensure UI updates
       await loadClients(); // Refresh all clients to get updated balances
       await loadInvoices(); // Refresh invoices
-      loadData(); // Refresh current client and ledger
+      await loadLedger(clientId); // Refresh ledger entries
+
+      // Force update local client state with new balance
+      const updatedClients = useClientStore.getState().clients;
+      const updatedClient = updatedClients.find(c => c.id === clientId);
+      if (updatedClient) {
+        setClient(updatedClient);
+      }
     } catch (error: any) {
       showErrorToast('Error', error.message || 'Failed to record payment');
     }

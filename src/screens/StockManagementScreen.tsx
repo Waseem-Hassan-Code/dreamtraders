@@ -49,7 +49,21 @@ export default function StockManagementScreen({ navigation }: any) {
     minStockLevel: '',
     unit: 'pcs',
     description: '',
+    itemsInPack: '', // Number of items in box/pack for bulk purchases
   });
+
+  // Check if unit is collective type (box, pack)
+  const isCollectiveUnit = formData.unit === 'box' || formData.unit === 'pack';
+
+  // Calculate unit price based on items in pack
+  const calculateUnitPrice = (totalPrice: string, itemsInPack: string) => {
+    const total = parseFloat(totalPrice) || 0;
+    const items = parseFloat(itemsInPack) || 0;
+    if (total > 0 && items > 0) {
+      return (total / items).toFixed(2);
+    }
+    return '0.00';
+  };
 
   useEffect(() => {
     loadStockItems('all');
@@ -160,6 +174,7 @@ export default function StockManagementScreen({ navigation }: any) {
       minStockLevel: '',
       unit: 'pcs',
       description: '',
+      itemsInPack: '',
     });
     setEditingItem(null);
   };
@@ -179,6 +194,7 @@ export default function StockManagementScreen({ navigation }: any) {
       minStockLevel: item.minStockLevel.toString(),
       unit: item.unit,
       description: item.description || '',
+      itemsInPack: '',
     });
     setShowAddModal(true);
   };
@@ -795,7 +811,9 @@ export default function StockManagementScreen({ navigation }: any) {
                         borderColor: theme.border,
                       },
                     ]}
-                    onPress={() => setFormData({ ...formData, unit })}
+                    onPress={() =>
+                      setFormData({ ...formData, unit, itemsInPack: '' })
+                    }
                   >
                     <Text
                       style={[
@@ -808,6 +826,178 @@ export default function StockManagementScreen({ navigation }: any) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              {/* Items in Pack - shown only for box/pack units */}
+              {isCollectiveUnit && (
+                <>
+                  <View
+                    style={[
+                      styles.unitPriceInfo,
+                      {
+                        backgroundColor: theme.primary + '10',
+                        borderColor: theme.primary + '30',
+                      },
+                    ]}
+                  >
+                    <Icon name="information" size={20} color={theme.primary} />
+                    <Text
+                      style={[
+                        styles.unitPriceInfoText,
+                        { color: theme.primary },
+                      ]}
+                    >
+                      For {formData.unit} purchases, enter items per{' '}
+                      {formData.unit} to calculate unit price
+                    </Text>
+                  </View>
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.label, { color: theme.textSecondary }]}
+                      >
+                        Items per{' '}
+                        {formData.unit.charAt(0).toUpperCase() +
+                          formData.unit.slice(1)}
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: theme.card,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        placeholder="e.g., 12, 24, 48"
+                        placeholderTextColor={theme.textTertiary}
+                        keyboardType="number-pad"
+                        value={formData.itemsInPack}
+                        onChangeText={text =>
+                          setFormData({ ...formData, itemsInPack: text })
+                        }
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.label, { color: theme.textSecondary }]}
+                      >
+                        Unit Price (Auto)
+                      </Text>
+                      <View
+                        style={[
+                          styles.input,
+                          styles.skuInput,
+                          {
+                            backgroundColor: theme.success + '15',
+                            borderColor: theme.success + '40',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: theme.success,
+                            fontSize: 16,
+                            fontWeight: '600',
+                          }}
+                        >
+                          PKR{' '}
+                          {calculateUnitPrice(
+                            formData.purchasePrice,
+                            formData.itemsInPack,
+                          )}
+                        </Text>
+                        <Icon
+                          name="calculator"
+                          size={16}
+                          color={theme.success}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  {formData.itemsInPack && formData.purchasePrice && (
+                    <View
+                      style={[
+                        styles.calculationSummary,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.calculationRow}>
+                        <Text
+                          style={[
+                            styles.calculationLabel,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Purchase Price / Item:
+                        </Text>
+                        <Text
+                          style={[
+                            styles.calculationValue,
+                            { color: theme.success },
+                          ]}
+                        >
+                          PKR{' '}
+                          {calculateUnitPrice(
+                            formData.purchasePrice,
+                            formData.itemsInPack,
+                          )}
+                        </Text>
+                      </View>
+                      {formData.discountablePrice && (
+                        <View style={styles.calculationRow}>
+                          <Text
+                            style={[
+                              styles.calculationLabel,
+                              { color: theme.textSecondary },
+                            ]}
+                          >
+                            Wholesale / Item:
+                          </Text>
+                          <Text
+                            style={[
+                              styles.calculationValue,
+                              { color: theme.primary },
+                            ]}
+                          >
+                            PKR{' '}
+                            {calculateUnitPrice(
+                              formData.discountablePrice,
+                              formData.itemsInPack,
+                            )}
+                          </Text>
+                        </View>
+                      )}
+                      {formData.salePrice && (
+                        <View style={styles.calculationRow}>
+                          <Text
+                            style={[
+                              styles.calculationLabel,
+                              { color: theme.textSecondary },
+                            ]}
+                          >
+                            Retail / Item:
+                          </Text>
+                          <Text
+                            style={[
+                              styles.calculationValue,
+                              { color: theme.warning },
+                            ]}
+                          >
+                            PKR{' '}
+                            {calculateUnitPrice(
+                              formData.salePrice,
+                              formData.itemsInPack,
+                            )}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
 
               <Text style={[styles.label, { color: theme.textSecondary }]}>
                 Description
@@ -1261,6 +1451,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 20,
+  },
+  unitPriceInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  unitPriceInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  calculationSummary: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  calculationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  calculationLabel: {
+    fontSize: 14,
+  },
+  calculationValue: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',

@@ -326,6 +326,7 @@ export type RootStackParamList = {
   AddExpense: undefined;
   Reports: undefined;
   Settings: undefined;
+  MonthlyEarnings: undefined;
 };
 
 // ============================================
