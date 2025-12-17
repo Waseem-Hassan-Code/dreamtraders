@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   Dimensions,
   StatusBar,
   Image,
+  Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useStockStore } from '@/store/stockStore';
@@ -16,6 +18,7 @@ import { useClientStore } from '@/store/clientStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useInvoiceStore } from '@/store/invoiceStore';
 import { useExpenseStore } from '@/store/expenseStore';
+import { shadows } from '@/utils/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -227,23 +230,73 @@ export default function DashboardScreen({ navigation }: any) {
     },
   };
 
-  const StatCard = ({ icon, value, label, color, onPress }: any) => (
-    <TouchableOpacity
-      style={[
-        styles.statCard,
-        { backgroundColor: theme.card, borderColor: theme.border },
-      ]}
-      onPress={onPress}
-    >
-      <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
-        <Icon name={icon} size={28} color={color} />
-      </View>
-      <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const StatCard = ({ icon, value, label, color, onPress, delay = 0 }: any) => {
+    const cardFade = useRef(new Animated.Value(0)).current;
+    const cardSlide = useRef(new Animated.Value(20)).current;
+
+    useEffect(() => {
+      Animated.parallel([
+        Animated.timing(cardFade, {
+          toValue: 1,
+          duration: 400,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardSlide, {
+          toValue: 0,
+          duration: 400,
+          delay,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, []);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.statCard,
+          { backgroundColor: theme.card, borderColor: theme.borderLight },
+          shadows.small,
+        ]}
+        onPress={onPress}
+        activeOpacity={0.8}
+      >
+        <Animated.View
+          style={{
+            opacity: cardFade,
+            transform: [{ translateY: cardSlide }],
+          }}
+        >
+          <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
+            <Icon name={icon} size={26} color={color} />
+          </View>
+          <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+            {label}
+          </Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -252,124 +305,140 @@ export default function DashboardScreen({ navigation }: any) {
         backgroundColor={theme.surface}
       />
 
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: theme.surface, borderBottomColor: theme.border },
-        ]}
+      {/* Modern Header */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [theme.surface, theme.background]
+            : [theme.surface, theme.background]
+        }
+        style={styles.headerGradient}
       >
-        <View style={styles.headerLeft}>
-          <Image
-            source={require('@/assets/images/AppLogo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>
-              Dream Traders
-            </Text>
-            <Text
-              style={[styles.headerSubtitle, { color: theme.textTertiary }]}
+        <Animated.View
+          style={[
+            styles.header,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.headerLeft}>
+            <View
+              style={[
+                styles.logoContainer,
+                { backgroundColor: theme.primary + '15' },
+              ]}
             >
-              Welcome back! 👋
-            </Text>
+              <Image
+                source={require('@/assets/images/appLogo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <View>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>
+                Dream Traders
+              </Text>
+              <Text
+                style={[styles.headerSubtitle, { color: theme.textTertiary }]}
+              >
+                Welcome back! 👋
+              </Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.settingsBtn, { backgroundColor: theme.card }]}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Icon name="cog" size={22} color={theme.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[
+                styles.settingsBtn,
+                { backgroundColor: theme.card },
+                shadows.small,
+              ]}
+              onPress={() => navigation.navigate('Settings')}
+              activeOpacity={0.8}
+            >
+              <Icon name="cog-outline" size={22} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Earnings Summary Card */}
-        <View
-          style={[
-            styles.earningsCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
+        {/* Modern Earnings Summary Card */}
+        <Animated.View
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
-          <View style={styles.earningsHeader}>
-            <Icon name="chart-line" size={24} color={theme.success} />
-            <Text style={[styles.earningsTitle, { color: theme.text }]}>
-              This Month's Performance
-            </Text>
-          </View>
-          <View style={styles.earningsRow}>
-            <View style={styles.earningsItem}>
-              <Text
-                style={[styles.earningsLabel, { color: theme.textSecondary }]}
-              >
-                Sales
-              </Text>
-              <Text style={[styles.earningsValue, { color: theme.success }]}>
-                PKR {monthlySales[new Date().getMonth()].toLocaleString()}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.earningsDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <View style={styles.earningsItem}>
-              <Text
-                style={[styles.earningsLabel, { color: theme.textSecondary }]}
-              >
-                Expenses
-              </Text>
-              <Text style={[styles.earningsValue, { color: theme.danger }]}>
-                PKR {monthlyExpenses[new Date().getMonth()].toLocaleString()}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.earningsDivider,
-                { backgroundColor: theme.border },
-              ]}
-            />
-            <View style={styles.earningsItem}>
-              <Text
-                style={[styles.earningsLabel, { color: theme.textSecondary }]}
-              >
-                Net Profit
-              </Text>
-              <Text
-                style={[
-                  styles.earningsValue,
-                  {
-                    color:
-                      currentMonthEarnings >= 0 ? theme.success : theme.danger,
-                  },
-                ]}
-              >
-                PKR {currentMonthEarnings.toLocaleString()}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.viewEarningsBtn,
-              { backgroundColor: theme.primary + '15' },
+          <LinearGradient
+            colors={[
+              currentMonthEarnings >= 0 ? theme.success : theme.danger,
+              currentMonthEarnings >= 0
+                ? theme.successGradientEnd || '#059669'
+                : theme.dangerGradientEnd || '#dc2626',
             ]}
-            onPress={() => navigation.navigate('MonthlyEarnings')}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.earningsCard, shadows.large]}
           >
-            <Text
-              style={[styles.viewEarningsBtnText, { color: theme.primary }]}
+            <View style={styles.earningsHeader}>
+              <View style={styles.earningsIconContainer}>
+                <Icon
+                  name="chart-line"
+                  size={28}
+                  color="rgba(255,255,255,0.9)"
+                />
+              </View>
+              <View>
+                <Text style={styles.earningsTitle}>
+                  This Month's Performance
+                </Text>
+                <Text style={styles.earningsDate}>
+                  {new Date().toLocaleDateString('en-US', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.earningsRow}>
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>Sales</Text>
+                <Text style={styles.earningsValue}>
+                  PKR {monthlySales[new Date().getMonth()].toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.earningsDivider} />
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>Expenses</Text>
+                <Text style={styles.earningsValue}>
+                  PKR {monthlyExpenses[new Date().getMonth()].toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.earningsDivider} />
+              <View style={styles.earningsItem}>
+                <Text style={styles.earningsLabel}>Net Profit</Text>
+                <Text style={[styles.earningsValue, styles.profitValue]}>
+                  PKR {currentMonthEarnings.toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.viewEarningsBtn}
+              onPress={() => navigation.navigate('MonthlyEarnings')}
+              activeOpacity={0.8}
             >
-              View Detailed Earnings
-            </Text>
-            <Icon name="chevron-right" size={18} color={theme.primary} />
-          </TouchableOpacity>
-        </View>
+              <Text style={styles.viewEarningsBtnText}>
+                View Detailed Report
+              </Text>
+              <Icon
+                name="chevron-right"
+                size={20}
+                color="rgba(255,255,255,0.9)"
+              />
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
@@ -378,27 +447,31 @@ export default function DashboardScreen({ navigation }: any) {
             value={totalClients}
             label="Total Clients"
             color={theme.primary}
+            delay={100}
             onPress={() => navigation.navigate('ClientList')}
           />
           <StatCard
-            icon="cash-multiple"
+            icon="cube-outline"
             value={`PKR ${(stockValue.saleValue / 1000).toFixed(0)}K`}
             label="Stock Worth"
             color={theme.success}
+            delay={200}
             onPress={() => navigation.navigate('StockManagement')}
           />
           <StatCard
-            icon="currency-usd"
+            icon="cash-clock"
             value={`PKR ${(totalOutstanding / 1000).toFixed(1)}K`}
             label="Outstanding"
             color={theme.warning}
+            delay={300}
             onPress={() => navigation.navigate('Reports')}
           />
           <StatCard
             icon="trending-up"
             value={`PKR ${(totalMargin / 1000).toFixed(0)}K`}
             label="Total Margin"
-            color="#8b5cf6"
+            color={theme.secondary}
+            delay={400}
             onPress={() => navigation.navigate('StockManagement')}
           />
         </View>
@@ -557,23 +630,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  headerGradient: {
+    paddingTop: StatusBar.currentHeight || 0,
+  },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+  },
+  logoContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   logo: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 2,
+    fontWeight: '500',
   },
   headerRight: {
     flexDirection: 'row',
@@ -587,110 +673,131 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 16,
+    paddingTop: 8,
     gap: 12,
   },
   statCard: {
-    width: '48%',
+    width: '47.5%',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   statValue: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 13,
+    fontWeight: '500',
   },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   earningsCard: {
     margin: 16,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    elevation: 2,
+    padding: 20,
+    borderRadius: 20,
   },
   earningsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 20,
+  },
+  earningsIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   earningsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  earningsDate: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   earningsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 14,
+    padding: 16,
   },
   earningsItem: {
     flex: 1,
     alignItems: 'center',
   },
   earningsLabel: {
-    fontSize: 12,
+    fontSize: 11,
     marginBottom: 4,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
   },
   earningsValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  profitValue: {
     fontSize: 16,
-    fontWeight: 'bold',
   },
   earningsDivider: {
     width: 1,
-    height: 40,
+    height: 36,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   viewEarningsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
     marginTop: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   viewEarningsBtnText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#fff',
   },
   alertSection: {
     margin: 16,
-    marginTop: 0,
+    marginTop: 8,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 2,
-    elevation: 2,
   },
   alertHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    gap: 8,
+    gap: 10,
   },
   alertTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
   },
   alertItem: {
     flexDirection: 'row',
@@ -712,7 +819,7 @@ const styles = StyleSheet.create({
   },
   alertItemQty: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   alertItemUnit: {
     fontSize: 12,
@@ -720,21 +827,20 @@ const styles = StyleSheet.create({
   },
   chartSection: {
     margin: 16,
-    marginTop: 0,
+    marginTop: 8,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    elevation: 2,
   },
   chartHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    gap: 8,
+    gap: 10,
   },
   chartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
   },
   chart: {
     marginVertical: 8,
@@ -746,7 +852,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginBottom: 16,
   },
   actionGrid: {
@@ -758,14 +864,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '45%',
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   actionText: {
     color: '#fff',

@@ -18,17 +18,25 @@ import { useCategoryStore } from '@/store/categoryStore';
 import { StockItem, CategorySettings } from '@/types';
 import { generateId, generateSequentialSKU } from '@/utils/idGenerator';
 import { showSuccessToast, showErrorToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 export default function StockManagementScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
-  const { stockItems, loadStockItems, createStockItem, updateStockItem } =
-    useStockStore();
+  const {
+    stockItems,
+    loadStockItems,
+    createStockItem,
+    updateStockItem,
+    deleteStockItem,
+  } = useStockStore();
   const { categories, loadCategories } = useCategoryStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<StockItem | null>(null);
 
   // Add Stock Modal State
   const [showAddStockModal, setShowAddStockModal] = useState(false);
@@ -134,6 +142,9 @@ export default function StockManagementScreen({ navigation }: any) {
         currentQuantity: parseFloat(formData.currentQuantity) || 0,
         minStockLevel: parseFloat(formData.minStockLevel) || 0,
         unit: formData.unit,
+        itemsInPack: formData.itemsInPack
+          ? parseInt(formData.itemsInPack)
+          : undefined,
         description: formData.description || undefined,
         createdAt: editingItem?.createdAt || new Date(),
         updatedAt: new Date(),
@@ -194,7 +205,7 @@ export default function StockManagementScreen({ navigation }: any) {
       minStockLevel: item.minStockLevel.toString(),
       unit: item.unit,
       description: item.description || '',
-      itemsInPack: '',
+      itemsInPack: item.itemsInPack?.toString() || '',
     });
     setShowAddModal(true);
   };
@@ -235,6 +246,26 @@ export default function StockManagementScreen({ navigation }: any) {
       );
     } catch (error: any) {
       showErrorToast('Error', error.message || 'Failed to add stock');
+    }
+  };
+
+  const handleDeleteStock = (item: StockItem) => {
+    setItemToDelete(item);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteStock = async () => {
+    if (!itemToDelete) return;
+    try {
+      await deleteStockItem(itemToDelete.id);
+      showSuccessToast('Deleted', `${itemToDelete.name} has been deleted`);
+      setShowAddModal(false);
+      setEditingItem(null);
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to delete stock item');
+    } finally {
+      setShowDeleteConfirm(false);
+      setItemToDelete(null);
     }
   };
 
@@ -1021,6 +1052,27 @@ export default function StockManagementScreen({ navigation }: any) {
                 }
               />
 
+              {/* Delete Button - only show when editing */}
+              {editingItem && (
+                <TouchableOpacity
+                  style={[
+                    styles.deleteStockButton,
+                    { borderColor: theme.danger },
+                  ]}
+                  onPress={() => handleDeleteStock(editingItem)}
+                >
+                  <Icon name="delete-outline" size={20} color={theme.danger} />
+                  <Text
+                    style={[
+                      styles.deleteStockButtonText,
+                      { color: theme.danger },
+                    ]}
+                  >
+                    Delete This Item
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               <View style={{ height: 20 }} />
             </ScrollView>
 
@@ -1195,6 +1247,21 @@ export default function StockManagementScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        visible={showDeleteConfirm}
+        title="Delete Stock Item"
+        message={`Are you sure you want to delete "${itemToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteStock}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setItemToDelete(null);
+        }}
+        destructive
+      />
     </View>
   );
 }
@@ -1500,5 +1567,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  deleteStockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 24,
+    gap: 8,
+  },
+  deleteStockButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

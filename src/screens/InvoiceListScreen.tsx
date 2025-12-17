@@ -18,15 +18,18 @@ import { useClientStore } from '@/store/clientStore';
 import { Invoice } from '@/types';
 import { generateAndShareInvoicePDF } from '@/utils/pdfGenerator';
 import { showSuccessToast, showErrorToast } from '@/utils/toast';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 export default function InvoiceListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
-  const { invoices, loadInvoices } = useInvoiceStore();
+  const { invoices, loadInvoices, deleteInvoice } = useInvoiceStore();
   const { clients, loadClients } = useClientStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -84,67 +87,102 @@ export default function InvoiceListScreen({ navigation }: any) {
     }
   };
 
-  const renderInvoice = ({ item }: { item: Invoice }) => (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: theme.card, borderColor: theme.border },
-      ]}
-      onPress={() => {
-        setSelectedInvoice(item);
-        setShowDetailsModal(true);
-      }}
-    >
-      <View style={styles.cardHeader}>
-        <View>
-          <Text style={[styles.invoiceNumber, { color: theme.text }]}>
-            #{item.invoiceNumber}
-          </Text>
-          <Text style={[styles.clientName, { color: theme.textSecondary }]}>
-            {item.client.name}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              backgroundColor:
-                item.status === 'PAID'
-                  ? theme.success + '20'
-                  : item.status === 'PARTIAL'
-                  ? theme.warning + '20'
-                  : theme.danger + '20',
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusText,
-              {
-                color:
-                  item.status === 'PAID'
-                    ? theme.success
-                    : item.status === 'PARTIAL'
-                    ? theme.warning
-                    : theme.danger,
-              },
-            ]}
-          >
-            {item.status}
-          </Text>
-        </View>
-      </View>
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    setInvoiceToDelete(invoice);
+    setShowDeleteConfirm(true);
+  };
 
-      <View style={styles.cardFooter}>
-        <Text style={[styles.date, { color: theme.textTertiary }]}>
-          {formatDate(item.createdAt)}
-        </Text>
-        <Text style={[styles.amount, { color: theme.text }]}>
-          PKR {item.total.toLocaleString()}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const confirmDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
+    try {
+      await deleteInvoice(invoiceToDelete.id);
+      showSuccessToast(
+        'Deleted',
+        `Invoice #${invoiceToDelete.invoiceNumber} has been deleted`,
+      );
+      setShowDetailsModal(false);
+      setSelectedInvoice(null);
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to delete invoice');
+    } finally {
+      setShowDeleteConfirm(false);
+      setInvoiceToDelete(null);
+    }
+  };
+
+  const renderInvoice = ({ item }: { item: Invoice }) => {
+    const statusColors = {
+      PAID: theme.success,
+      PARTIAL: theme.warning,
+      UNPAID: theme.danger,
+    };
+    const statusColor = statusColors[item.status] || theme.textSecondary;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderLeftColor: statusColor,
+            borderLeftWidth: 4,
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={() => {
+          setSelectedInvoice(item);
+          setShowDetailsModal(true);
+        }}
+      >
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.invoiceNumber, { color: theme.text }]}>
+              #{item.invoiceNumber}
+            </Text>
+            <Text style={[styles.clientName, { color: theme.textSecondary }]}>
+              {item.client.name}
+            </Text>
+          </View>
+          <View style={styles.cardRight}>
+            <Text style={[styles.amount, { color: theme.text }]}>
+              PKR {item.total.toLocaleString()}
+            </Text>
+            <View style={styles.statusRow}>
+              <Icon
+                name={
+                  item.status === 'PAID'
+                    ? 'check-circle'
+                    : item.status === 'PARTIAL'
+                    ? 'progress-clock'
+                    : 'alert-circle-outline'
+                }
+                size={14}
+                color={statusColor}
+              />
+              <Text style={[styles.statusTextSmall, { color: statusColor }]}>
+                {item.status === 'PAID'
+                  ? 'Paid'
+                  : item.status === 'PARTIAL'
+                  ? 'Partial'
+                  : 'Unpaid'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+          <Text style={[styles.date, { color: theme.textTertiary }]}>
+            {formatDate(item.createdAt)}
+          </Text>
+          {item.status !== 'PAID' && (
+            <Text style={[styles.dueAmount, { color: theme.danger }]}>
+              Due: PKR {item.amountDue.toLocaleString()}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -519,11 +557,41 @@ export default function InvoiceListScreen({ navigation }: any) {
                 </View>
               </View>
 
+              {/* Delete Button */}
+              <TouchableOpacity
+                style={[styles.deleteButton, { borderColor: theme.danger }]}
+                onPress={() =>
+                  selectedInvoice && handleDeleteInvoice(selectedInvoice)
+                }
+              >
+                <Icon name="delete-outline" size={20} color={theme.danger} />
+                <Text
+                  style={[styles.deleteButtonText, { color: theme.danger }]}
+                >
+                  Delete Invoice
+                </Text>
+              </TouchableOpacity>
+
               <View style={{ height: 20 }} />
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        visible={showDeleteConfirm}
+        title="Delete Invoice"
+        message={`Are you sure you want to delete Invoice #${invoiceToDelete?.invoiceNumber}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteInvoice}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setInvoiceToDelete(null);
+        }}
+        destructive
+      />
     </View>
   );
 }
@@ -549,30 +617,39 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  cardRight: {
+    alignItems: 'flex-end',
   },
   invoiceNumber: { fontSize: 16, fontWeight: 'bold' },
   clientName: { fontSize: 14, marginTop: 2 },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 10,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
   },
-  statusText: { fontSize: 11, fontWeight: 'bold' },
+  statusTextSmall: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 12,
+    marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
   },
   date: { fontSize: 12 },
   amount: { fontSize: 16, fontWeight: 'bold' },
+  dueAmount: { fontSize: 13, fontWeight: '600' },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -748,6 +825,20 @@ const styles = StyleSheet.create({
   },
   pdfButtonText: {
     color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    gap: 8,
+  },
+  deleteButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },

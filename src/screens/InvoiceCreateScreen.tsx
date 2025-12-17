@@ -74,17 +74,93 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
       return;
     }
 
+    // Check if this is a pack/box item
+    const isPack =
+      (item.unit === 'box' || item.unit === 'pack') &&
+      item.itemsInPack &&
+      item.itemsInPack > 0;
+
     const newItem: SaleItem = {
       stockItemId: item.id,
       stockItemName: item.name,
       quantity: 1,
       unitPrice: item.salePrice,
       total: item.salePrice,
-      availableQuantity: item.currentQuantity, // Track available quantity
+      availableQuantity: item.currentQuantity,
+      isPack: isPack,
+      itemsInPack: item.itemsInPack,
+      packsQuantity: isPack ? 1 : undefined,
+      looseQuantity: 0,
     };
 
     setInvoiceItems([...invoiceItems, newItem]);
     setShowItemModal(false);
+  };
+
+  // Update pack quantity (full packs)
+  const updatePackQuantity = (index: number, packs: number) => {
+    const newItems = [...invoiceItems];
+    const item = newItems[index];
+    const stockItem = stockItems.find(s => s.id === item.stockItemId);
+
+    if (!stockItem) return;
+
+    const looseItems = item.looseQuantity || 0;
+    const totalQuantity = packs + looseItems / (item.itemsInPack || 1);
+
+    if (totalQuantity > stockItem.currentQuantity) {
+      showErrorToast(
+        'Insufficient Stock',
+        `Only ${stockItem.currentQuantity} ${stockItem.unit} available`,
+      );
+      return;
+    }
+
+    item.packsQuantity = packs;
+    item.quantity = totalQuantity;
+    // Calculate total: packs at pack price + loose items at per-item price
+    const packTotal = packs * item.unitPrice;
+    const looseTotal = looseItems * (item.unitPrice / (item.itemsInPack || 1));
+    item.total = Math.round(packTotal + looseTotal);
+    setInvoiceItems(newItems);
+  };
+
+  // Update loose items quantity (from partial pack)
+  const updateLooseQuantity = (index: number, loose: number) => {
+    const newItems = [...invoiceItems];
+    const item = newItems[index];
+    const stockItem = stockItems.find(s => s.id === item.stockItemId);
+
+    if (!stockItem || !item.itemsInPack) return;
+
+    // Validate loose quantity doesn't exceed items in pack - 1
+    if (loose >= item.itemsInPack) {
+      showErrorToast(
+        'Invalid Quantity',
+        `Max ${item.itemsInPack - 1} loose items allowed`,
+      );
+      return;
+    }
+
+    const packs = item.packsQuantity || 0;
+    const totalQuantity = packs + loose / item.itemsInPack;
+
+    if (totalQuantity > stockItem.currentQuantity) {
+      showErrorToast(
+        'Insufficient Stock',
+        `Only ${stockItem.currentQuantity} ${stockItem.unit} available`,
+      );
+      return;
+    }
+
+    item.looseQuantity = loose;
+    item.quantity = totalQuantity;
+
+    // Calculate total: packs at pack price + loose items at per-item price
+    const packTotal = packs * item.unitPrice;
+    const looseTotal = loose * (item.unitPrice / item.itemsInPack);
+    item.total = Math.round(packTotal + looseTotal);
+    setInvoiceItems(newItems);
   };
 
   const updateItemQuantity = (index: number, quantity: number) => {
@@ -294,6 +370,8 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
           const stockItem = stockItems.find(s => s.id === item.stockItemId);
           const availableQty = stockItem?.currentQuantity || 0;
           const isOverStock = item.quantity > availableQty;
+          const isPack =
+            item.isPack && item.itemsInPack && item.itemsInPack > 0;
 
           return (
             <View
@@ -320,6 +398,7 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
                     ]}
                   >
                     Available: {availableQty} {stockItem?.unit || 'pcs'}
+                    {isPack && ` (${item.itemsInPack} items/pack)`}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => removeItem(index)}>
@@ -327,66 +406,221 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.itemControls}>
-                <View style={styles.controlGroup}>
-                  <Text
+              {/* Pack/Loose Controls for pack items */}
+              {isPack ? (
+                <View style={styles.packControls}>
+                  <View style={styles.packRow}>
+                    <View style={styles.controlGroup}>
+                      <Text
+                        style={[
+                          styles.controlLabel,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Full Packs
+                      </Text>
+                      <View style={styles.qtyAdjuster}>
+                        <TouchableOpacity
+                          style={[
+                            styles.qtyBtn,
+                            { backgroundColor: theme.surface },
+                          ]}
+                          onPress={() =>
+                            updatePackQuantity(
+                              index,
+                              Math.max(0, (item.packsQuantity || 0) - 1),
+                            )
+                          }
+                        >
+                          <Icon name="minus" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={[
+                            styles.qtyInput,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          keyboardType="number-pad"
+                          value={(item.packsQuantity || 0).toString()}
+                          onChangeText={text =>
+                            updatePackQuantity(index, parseInt(text) || 0)
+                          }
+                        />
+                        <TouchableOpacity
+                          style={[
+                            styles.qtyBtn,
+                            { backgroundColor: theme.surface },
+                          ]}
+                          onPress={() =>
+                            updatePackQuantity(
+                              index,
+                              (item.packsQuantity || 0) + 1,
+                            )
+                          }
+                        >
+                          <Icon name="plus" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.controlGroup}>
+                      <Text
+                        style={[
+                          styles.controlLabel,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Loose Items
+                      </Text>
+                      <View style={styles.qtyAdjuster}>
+                        <TouchableOpacity
+                          style={[
+                            styles.qtyBtn,
+                            { backgroundColor: theme.surface },
+                          ]}
+                          onPress={() =>
+                            updateLooseQuantity(
+                              index,
+                              Math.max(0, (item.looseQuantity || 0) - 1),
+                            )
+                          }
+                        >
+                          <Icon name="minus" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={[
+                            styles.qtyInput,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          keyboardType="number-pad"
+                          value={(item.looseQuantity || 0).toString()}
+                          onChangeText={text =>
+                            updateLooseQuantity(index, parseInt(text) || 0)
+                          }
+                        />
+                        <TouchableOpacity
+                          style={[
+                            styles.qtyBtn,
+                            { backgroundColor: theme.surface },
+                          ]}
+                          onPress={() =>
+                            updateLooseQuantity(
+                              index,
+                              (item.looseQuantity || 0) + 1,
+                            )
+                          }
+                        >
+                          <Icon name="plus" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View
                     style={[
-                      styles.controlLabel,
-                      { color: theme.textSecondary },
+                      styles.packSummary,
+                      { backgroundColor: theme.surface },
                     ]}
                   >
-                    Qty
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.smallInput,
-                      {
-                        color: isOverStock ? theme.danger : theme.text,
-                        borderColor: isOverStock ? theme.danger : theme.border,
-                      },
-                    ]}
-                    keyboardType="decimal-pad"
-                    value={item.quantity.toString()}
-                    onChangeText={text =>
-                      updateItemQuantity(index, parseFloat(text) || 0)
-                    }
-                  />
+                    <Text
+                      style={[
+                        styles.packSummaryText,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {item.packsQuantity || 0} packs × PKR{' '}
+                      {item.unitPrice.toLocaleString()} = PKR{' '}
+                      {(
+                        (item.packsQuantity || 0) * item.unitPrice
+                      ).toLocaleString()}
+                    </Text>
+                    {(item.looseQuantity || 0) > 0 && (
+                      <Text
+                        style={[
+                          styles.packSummaryText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        + {item.looseQuantity} items × PKR{' '}
+                        {Math.round(
+                          item.unitPrice / (item.itemsInPack || 1),
+                        ).toLocaleString()}{' '}
+                        = PKR{' '}
+                        {Math.round(
+                          (item.looseQuantity || 0) *
+                            (item.unitPrice / (item.itemsInPack || 1)),
+                        ).toLocaleString()}
+                      </Text>
+                    )}
+                    <Text style={[styles.packTotal, { color: theme.primary }]}>
+                      Total: PKR {item.total.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.controlGroup}>
-                  <Text
-                    style={[
-                      styles.controlLabel,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    Price
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.smallInput,
-                      { color: theme.text, borderColor: theme.border },
-                    ]}
-                    keyboardType="decimal-pad"
-                    value={item.unitPrice.toString()}
-                    onChangeText={text =>
-                      updateItemPrice(index, parseFloat(text) || 0)
-                    }
-                  />
+              ) : (
+                /* Regular item controls */
+                <View style={styles.itemControls}>
+                  <View style={styles.controlGroup}>
+                    <Text
+                      style={[
+                        styles.controlLabel,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Qty
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.smallInput,
+                        {
+                          color: isOverStock ? theme.danger : theme.text,
+                          borderColor: isOverStock
+                            ? theme.danger
+                            : theme.border,
+                        },
+                      ]}
+                      keyboardType="decimal-pad"
+                      value={item.quantity.toString()}
+                      onChangeText={text =>
+                        updateItemQuantity(index, parseFloat(text) || 0)
+                      }
+                    />
+                  </View>
+                  <View style={styles.controlGroup}>
+                    <Text
+                      style={[
+                        styles.controlLabel,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Price
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.smallInput,
+                        { color: theme.text, borderColor: theme.border },
+                      ]}
+                      keyboardType="decimal-pad"
+                      value={item.unitPrice.toString()}
+                      onChangeText={text =>
+                        updateItemPrice(index, parseFloat(text) || 0)
+                      }
+                    />
+                  </View>
+                  <View style={styles.controlGroup}>
+                    <Text
+                      style={[
+                        styles.controlLabel,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Total
+                    </Text>
+                    <Text style={[styles.itemTotal, { color: theme.text }]}>
+                      {item.total.toLocaleString()}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.controlGroup}>
-                  <Text
-                    style={[
-                      styles.controlLabel,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    Total
-                  </Text>
-                  <Text style={[styles.itemTotal, { color: theme.text }]}>
-                    {item.total.toLocaleString()}
-                  </Text>
-                </View>
-              </View>
+              )}
             </View>
           );
         })}
@@ -1070,5 +1304,47 @@ const styles = StyleSheet.create({
   stockBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  // Pack controls styles
+  packControls: {
+    marginTop: 8,
+  },
+  packRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  qtyAdjuster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qtyInput: {
+    width: 70,
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  packSummary: {
+    padding: 10,
+    borderRadius: 8,
+  },
+  packSummaryText: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  packTotal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 4,
   },
 });

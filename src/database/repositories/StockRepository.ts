@@ -126,8 +126,8 @@ export class StockRepository implements IStockRepository {
       `INSERT INTO stock_items (
         id, category_id, name, sku, barcode, purchase_price, discountable_price,
         sale_price, current_quantity, min_stock_level, supplier_id, description,
-        unit, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        unit, items_in_pack, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.categoryId,
@@ -142,6 +142,7 @@ export class StockRepository implements IStockRepository {
         data.supplierId || null,
         data.description || null,
         data.unit,
+        data.itemsInPack || null,
         now,
         now,
       ],
@@ -172,6 +173,7 @@ export class StockRepository implements IStockRepository {
       'supplierId',
       'description',
       'unit',
+      'itemsInPack',
     ];
 
     const columnMap: Record<string, string> = {
@@ -182,6 +184,7 @@ export class StockRepository implements IStockRepository {
       currentQuantity: 'current_quantity',
       minStockLevel: 'min_stock_level',
       supplierId: 'supplier_id',
+      itemsInPack: 'items_in_pack',
     };
 
     fields.forEach(field => {
@@ -302,6 +305,7 @@ export class StockRepository implements IStockRepository {
       supplierId: row.supplier_id,
       description: row.description,
       unit: row.unit,
+      itemsInPack: row.items_in_pack || undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       deletedAt: row.deleted_at ? new Date(row.deleted_at) : undefined,

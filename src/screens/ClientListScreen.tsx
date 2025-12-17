@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,10 @@ import {
   Modal,
   FlatList,
   StatusBar,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemeStore } from '@/store/themeStore';
 import { useClientStore } from '@/store/clientStore';
@@ -17,6 +20,198 @@ import { Client } from '@/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { showSuccessToast, showErrorToast } from '@/utils/toast';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
+import { shadows } from '@/utils/theme';
+
+const { width } = Dimensions.get('window');
+
+// Phone number formatting/masking function
+const formatPhoneNumber = (text: string): string => {
+  // Remove all non-digit characters
+  const cleaned = text.replace(/\D/g, '');
+
+  // Apply Pakistani phone format: 03XX-XXXXXXX
+  if (cleaned.length <= 4) {
+    return cleaned;
+  } else if (cleaned.length <= 11) {
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+  }
+  return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 11)}`;
+};
+
+// Get raw phone number without formatting
+const getRawPhoneNumber = (formatted: string): string => {
+  return formatted.replace(/\D/g, '');
+};
+
+// Animated Client Card Component (extracted to avoid hook rules violation)
+const ClientCard = ({
+  item,
+  index,
+  theme,
+  navigation,
+  onDelete,
+}: {
+  item: Client;
+  index: number;
+  theme: any;
+  navigation: any;
+  onDelete: (client: Client) => void;
+}) => {
+  const animValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animValue, {
+      toValue: 1,
+      duration: 300,
+      delay: Math.min(index * 50, 500),
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: animValue,
+        transform: [
+          {
+            translateY: animValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      <TouchableOpacity
+        style={[
+          styles.clientCard,
+          { backgroundColor: theme.card, borderColor: theme.borderLight },
+          shadows.small,
+        ]}
+        onPress={() =>
+          navigation.navigate('ClientDetails', { clientId: item.id })
+        }
+        activeOpacity={0.8}
+      >
+        {/* Card Header */}
+        <View style={styles.clientHeader}>
+          <View
+            style={[
+              styles.clientAvatar,
+              { backgroundColor: theme.primary + '15' },
+            ]}
+          >
+            <Text style={[styles.avatarText, { color: theme.primary }]}>
+              {item.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.clientInfo}>
+            <Text style={[styles.clientName, { color: theme.text }]}>
+              {item.name}
+            </Text>
+            <Text style={[styles.clientShop, { color: theme.textSecondary }]}>
+              {item.shopName}
+            </Text>
+            <View style={styles.contactRow}>
+              <Icon name="phone-outline" size={13} color={theme.textTertiary} />
+              <Text style={[styles.clientPhone, { color: theme.textTertiary }]}>
+                {item.phone}
+              </Text>
+            </View>
+          </View>
+
+          {/* Balance Badge */}
+          <View style={styles.clientActions}>
+            <LinearGradient
+              colors={
+                item.balance > 0
+                  ? [theme.danger + '20', theme.danger + '10']
+                  : [theme.success + '20', theme.success + '10']
+              }
+              style={styles.balanceBadge}
+            >
+              <Text
+                style={[
+                  styles.balanceText,
+                  { color: item.balance > 0 ? theme.danger : theme.success },
+                ]}
+              >
+                PKR {Math.abs(item.balance).toLocaleString()}
+              </Text>
+              <Text
+                style={[
+                  styles.balanceLabel,
+                  { color: item.balance > 0 ? theme.danger : theme.success },
+                ]}
+              >
+                {item.balance > 0 ? 'Due' : 'Credit'}
+              </Text>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Extra Details */}
+        {(item.area || item.whatsapp) && (
+          <View style={styles.clientDetails}>
+            {item.area && (
+              <View
+                style={[
+                  styles.detailChip,
+                  { backgroundColor: theme.background },
+                ]}
+              >
+                <Icon
+                  name="map-marker-outline"
+                  size={13}
+                  color={theme.textTertiary}
+                />
+                <Text
+                  style={[styles.detailText, { color: theme.textSecondary }]}
+                >
+                  {item.area}
+                </Text>
+              </View>
+            )}
+            {item.whatsapp && (
+              <View
+                style={[styles.detailChip, { backgroundColor: '#25D36610' }]}
+              >
+                <Icon name="whatsapp" size={13} color="#25D366" />
+                <Text style={[styles.detailText, { color: '#25D366' }]}>
+                  WhatsApp
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Footer Stats */}
+        <View
+          style={[styles.clientStats, { borderTopColor: theme.borderLight }]}
+        >
+          <View style={styles.statItem}>
+            <Icon name="chart-line" size={16} color={theme.textTertiary} />
+            <Text style={[styles.statLabel, { color: theme.textTertiary }]}>
+              Total Business
+            </Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              PKR {item.totalBusinessValue.toLocaleString()}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.deleteButton,
+              { backgroundColor: theme.danger + '10' },
+            ]}
+            onPress={() => onDelete(item)}
+          >
+            <Icon name="trash-can-outline" size={18} color={theme.danger} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 export default function ClientListScreen({ navigation }: any) {
   const { theme, isDark } = useThemeStore();
@@ -170,146 +365,86 @@ export default function ClientListScreen({ navigation }: any) {
     });
   };
 
-  const renderClientCard = ({ item }: { item: Client }) => (
-    <TouchableOpacity
-      style={[
-        styles.clientCard,
-        { backgroundColor: theme.card, borderColor: theme.border },
-      ]}
-      onPress={() =>
-        navigation.navigate('ClientDetails', { clientId: item.id })
-      }
-    >
-      <View style={styles.clientHeader}>
-        <View
-          style={[
-            styles.clientAvatar,
-            { backgroundColor: theme.primary + '20' },
-          ]}
-        >
-          <Icon name="account" size={32} color={theme.primary} />
-        </View>
-        <View style={styles.clientInfo}>
-          <Text style={[styles.clientName, { color: theme.text }]}>
-            {item.name}
-          </Text>
-          <Text style={[styles.clientShop, { color: theme.textSecondary }]}>
-            {item.shopName}
-          </Text>
-          <View style={styles.contactRow}>
-            <Icon name="phone" size={14} color={theme.textTertiary} />
-            <Text style={[styles.clientPhone, { color: theme.textTertiary }]}>
-              {item.phone}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.clientActions}>
-          <View
-            style={[
-              styles.balanceBadge,
-              {
-                backgroundColor:
-                  item.balance > 0 ? theme.danger + '20' : theme.success + '20',
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.balanceText,
-                { color: item.balance > 0 ? theme.danger : theme.success },
-              ]}
-            >
-              PKR {Math.abs(item.balance).toLocaleString()}
-            </Text>
-            <Text
-              style={[
-                styles.balanceLabel,
-                { color: item.balance > 0 ? theme.danger : theme.success },
-              ]}
-            >
-              {item.balance > 0 ? 'Due' : 'Credit'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {(item.area || item.email || item.whatsapp) && (
-        <View style={styles.clientDetails}>
-          {item.area && (
-            <View style={styles.detailRow}>
-              <Icon name="map-marker" size={14} color={theme.textTertiary} />
-              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.area}
-              </Text>
-            </View>
-          )}
-          {item.email && (
-            <View style={styles.detailRow}>
-              <Icon name="email" size={14} color={theme.textTertiary} />
-              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.email}
-              </Text>
-            </View>
-          )}
-          {item.whatsapp && (
-            <View style={styles.detailRow}>
-              <Icon name="whatsapp" size={14} color="#25D366" />
-              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.whatsapp}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      <View style={styles.clientStats}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: theme.textTertiary }]}>
-            Total Business
-          </Text>
-          <Text style={[styles.statValue, { color: theme.text }]}>
-            PKR {item.totalBusinessValue.toLocaleString()}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteClient(item)}
-        >
-          <Icon name="delete" size={20} color={theme.danger} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderClientCard = ({
+    item,
+    index,
+  }: {
+    item: Client;
+    index: number;
+  }) => {
+    return (
+      <ClientCard
+        item={item}
+        index={index}
+        theme={theme}
+        navigation={navigation}
+        onDelete={handleDeleteClient}
+      />
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.surface}
+        backgroundColor="transparent"
+        translucent
       />
 
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: theme.surface, borderBottomColor: theme.border },
-        ]}
+      {/* Modern Header */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [theme.surface, theme.background]
+            : [theme.surface, theme.background]
+        }
+        style={styles.headerGradient}
       >
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Clients ({clients.length})
-        </Text>
-      </View>
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>
+              Clients
+            </Text>
+            <Text
+              style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+            >
+              {clients.length} total clients
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.headerBadge,
+              { backgroundColor: theme.primary + '15' },
+            ]}
+          >
+            <Icon name="account-group" size={20} color={theme.primary} />
+          </View>
+        </View>
+      </LinearGradient>
 
-      <View
-        style={[styles.searchContainer, { backgroundColor: theme.surface }]}
-      >
-        <Icon name="magnify" size={20} color={theme.textSecondary} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.text }]}
-          placeholder="Search clients..."
-          placeholderTextColor={theme.textTertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+      {/* Modern Search Bar */}
+      <View style={styles.searchWrapper}>
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: theme.card, borderColor: theme.borderLight },
+            shadows.small,
+          ]}
+        >
+          <Icon name="magnify" size={22} color={theme.textTertiary} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search by name, shop, or phone..."
+            placeholderTextColor={theme.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Icon name="close-circle" size={18} color={theme.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -318,27 +453,69 @@ export default function ClientListScreen({ navigation }: any) {
         keyExtractor={(item: Client) => item.id}
         // @ts-ignore - contentContainerStyle is valid in React Native 0.82
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Icon name="account-group" size={64} color={theme.textTertiary} />
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No clients found
-            </Text>
-            <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-              onPress={() => setShowAddModal(true)}
+            <View
+              style={[
+                styles.emptyIconContainer,
+                { backgroundColor: theme.primary + '15' },
+              ]}
             >
-              <Text style={styles.emptyButtonText}>Add Your First Client</Text>
-            </TouchableOpacity>
+              <Icon
+                name="account-search-outline"
+                size={56}
+                color={theme.primary}
+              />
+            </View>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              No Clients Found
+            </Text>
+            <Text
+              style={[styles.emptySubtitle, { color: theme.textSecondary }]}
+            >
+              {searchQuery
+                ? 'Try a different search term'
+                : 'Add your first client to get started'}
+            </Text>
+            {!searchQuery && (
+              <TouchableOpacity
+                style={[styles.emptyButton, shadows.colored(theme.primary)]}
+                onPress={() => setShowAddModal(true)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[
+                    theme.primary,
+                    theme.primaryGradientEnd || '#1d4ed8',
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.emptyButtonGradient}
+                >
+                  <Icon name="plus" size={20} color="#fff" />
+                  <Text style={styles.emptyButtonText}>Add First Client</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
 
+      {/* Modern FAB */}
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.primary }]}
+        style={styles.fabContainer}
         onPress={() => setShowAddModal(true)}
+        activeOpacity={0.9}
       >
-        <Icon name="plus" size={32} color="#fff" />
+        <LinearGradient
+          colors={[theme.primary, theme.primaryGradientEnd || '#1d4ed8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.fab, shadows.medium]}
+        >
+          <Icon name="plus" size={28} color="#fff" />
+        </LinearGradient>
       </TouchableOpacity>
 
       {/* Add/Edit Client Modal */}
@@ -355,21 +532,50 @@ export default function ClientListScreen({ navigation }: any) {
           <View
             style={[styles.modalContent, { backgroundColor: theme.surface }]}
           >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {editingClient ? 'Edit Client' : 'Add New Client'}
-              </Text>
+            <View style={styles.modalHandle}>
+              <View
+                style={[styles.handleBar, { backgroundColor: theme.border }]}
+              />
+            </View>
+
+            <View
+              style={[styles.modalHeader, { borderBottomColor: theme.border }]}
+            >
+              <View style={styles.modalTitleRow}>
+                <View
+                  style={[
+                    styles.modalIcon,
+                    { backgroundColor: theme.primary + '15' },
+                  ]}
+                >
+                  <Icon
+                    name={editingClient ? 'account-edit' : 'account-plus'}
+                    size={24}
+                    color={theme.primary}
+                  />
+                </View>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  {editingClient ? 'Edit Client' : 'Add New Client'}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={() => {
                   resetForm();
                   setShowAddModal(false);
                 }}
+                style={[
+                  styles.closeButton,
+                  { backgroundColor: theme.background },
+                ]}
               >
-                <Icon name="close" size={24} color={theme.text} />
+                <Icon name="close" size={20} color={theme.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView
+              style={styles.modalBody}
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={[styles.label, { color: theme.textSecondary }]}>
                 Client Name *
               </Text>
@@ -422,12 +628,16 @@ export default function ClientListScreen({ navigation }: any) {
                         borderColor: theme.border,
                       },
                     ]}
-                    placeholder="03XXXXXXXXX"
+                    placeholder="03XX-XXXXXXX"
                     placeholderTextColor={theme.textTertiary}
                     keyboardType="phone-pad"
-                    value={formData.phone}
+                    maxLength={12}
+                    value={formatPhoneNumber(formData.phone)}
                     onChangeText={text =>
-                      setFormData({ ...formData, phone: text })
+                      setFormData({
+                        ...formData,
+                        phone: getRawPhoneNumber(text),
+                      })
                     }
                   />
                 </View>
@@ -444,12 +654,20 @@ export default function ClientListScreen({ navigation }: any) {
                         borderColor: theme.border,
                       },
                     ]}
-                    placeholder="Optional"
+                    placeholder="03XX-XXXXXXX"
                     placeholderTextColor={theme.textTertiary}
                     keyboardType="phone-pad"
-                    value={formData.whatsapp}
+                    maxLength={12}
+                    value={
+                      formData.whatsapp
+                        ? formatPhoneNumber(formData.whatsapp)
+                        : ''
+                    }
                     onChangeText={text =>
-                      setFormData({ ...formData, whatsapp: text })
+                      setFormData({
+                        ...formData,
+                        whatsapp: getRawPhoneNumber(text),
+                      })
                     }
                   />
                 </View>
@@ -565,19 +783,35 @@ export default function ClientListScreen({ navigation }: any) {
                   resetForm();
                   setShowAddModal(false);
                 }}
+                activeOpacity={0.8}
               >
                 <Text style={[styles.cancelButtonText, { color: theme.text }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: theme.primary }]}
+                style={[styles.saveButton, shadows.colored(theme.primary)]}
                 onPress={handleSaveClient}
+                activeOpacity={0.8}
               >
-                <Icon name="check" size={20} color="#fff" />
-                <Text style={styles.saveButtonText}>
-                  {editingClient ? 'Update' : 'Save'}
-                </Text>
+                <LinearGradient
+                  colors={[
+                    theme.primary,
+                    theme.primaryGradientEnd || '#1d4ed8',
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.saveButtonGradient}
+                >
+                  <Icon
+                    name={editingClient ? 'content-save' : 'check'}
+                    size={20}
+                    color="#fff"
+                  />
+                  <Text style={styles.saveButtonText}>
+                    {editingClient ? 'Update' : 'Save'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -602,98 +836,219 @@ export default function ClientListScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerGradient: {
+    paddingTop: StatusBar.currentHeight || 44,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  headerBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 8,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
   },
-  searchInput: { flex: 1, fontSize: 16 },
-  listContent: { padding: 16 },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  listContent: {
+    padding: 16,
+    paddingTop: 8,
+  },
   clientCard: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   clientHeader: {
     flexDirection: 'row',
     marginBottom: 12,
   },
   clientAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  clientInfo: { flex: 1 },
-  clientName: { fontSize: 18, fontWeight: 'bold', marginBottom: 2 },
-  clientShop: { fontSize: 14, marginBottom: 4 },
-  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  clientPhone: { fontSize: 12 },
-  clientActions: { alignItems: 'flex-end' },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  clientShop: {
+    fontSize: 14,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  clientPhone: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  clientActions: {
+    alignItems: 'flex-end',
+  },
   balanceBadge: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  balanceText: { fontSize: 14, fontWeight: 'bold' },
-  balanceLabel: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+  balanceText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  balanceLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   clientDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 12,
-    gap: 6,
+  },
+  detailChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 5,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  detailText: { fontSize: 13 },
+  detailText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   clientStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  statItem: {},
-  statLabel: { fontSize: 12 },
-  statValue: { fontSize: 16, fontWeight: 'bold', marginTop: 2 },
-  deleteButton: { padding: 8 },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deleteButton: {
+    padding: 10,
+    borderRadius: 10,
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 32,
   },
-  emptyText: { fontSize: 16, marginTop: 16, marginBottom: 24 },
-  emptyButton: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  emptyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  fab: {
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  emptyText: {
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  emptyButton: {
+    marginTop: 24,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  emptyButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fabContainer: {
     position: 'absolute',
     bottom: 24,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -703,21 +1058,67 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    maxHeight: '92%',
+  },
+  modalHandle: {
+    alignItems: 'center',
+    paddingTop: 12,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
+    paddingTop: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  modalBody: { padding: 20 },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 12 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16 },
-  row: { flexDirection: 'row', gap: 12 },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   modalFooter: {
     flexDirection: 'row',
     padding: 20,
@@ -727,19 +1128,29 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
   },
-  cancelButtonText: { fontSize: 16, fontWeight: '600' },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   saveButton: {
     flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  saveButtonGradient: {
     flexDirection: 'row',
     padding: 16,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

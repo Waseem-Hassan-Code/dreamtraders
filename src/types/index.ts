@@ -46,6 +46,7 @@ export interface StockItem {
   supplierId?: string;
   description?: string;
   unit: string; // kg, pcs, box, etc.
+  itemsInPack?: number; // Number of items in a pack/box for bulk purchases
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
@@ -111,6 +112,12 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  // Pack-related fields
+  isPack?: boolean; // Whether this is a pack/box purchase
+  packsQuantity?: number; // Number of full packs
+  looseQuantity?: number; // Number of loose items (from partial pack)
+  itemsInPack?: number; // Items per pack (from stock item)
+  availableQuantity?: number; // For validation
 }
 
 // ============================================

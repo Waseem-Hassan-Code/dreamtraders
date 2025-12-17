@@ -1,20 +1,19 @@
 import React from 'react';
-import { View, Image, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen() {
   return (
     <View style={styles.container}>
-      <Image
-        source={require('@/assets/images/LightMode_Splash.png')}
-        style={styles.splashImage}
-        resizeMode="cover"
+      <LottieView
+        source={require('@/assets/animations/splash.json')}
+        style={styles.lottie}
+        autoPlay
+        loop
       />
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
-        <Text style={styles.loadingText}>Initializing...</Text>
-      </View>
+      <Text style={styles.loadingText}>Dream Traders</Text>
     </View>
   );
 }
@@ -24,23 +23,18 @@ const styles = StyleSheet.create({
     flex: 1,
     width,
     height,
-  },
-  splashImage: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
+    backgroundColor: '#0ea5e9',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  lottie: {
+    width: width * 0.8,
+    height: width * 0.8,
+  },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#0ea5e9',
-    fontWeight: '600',
+    marginTop: 20,
+    fontSize: 24,
+    color: '#ffffff',
+    fontWeight: 'bold',
   },
 });

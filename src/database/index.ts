@@ -262,6 +262,78 @@ export class Database {
       const migration1 = 'add_deleted_at_to_stock_items';
       // ... migration logic removed ...
       */
+
+      // Migration 2: Add is_synced column to all main tables for Firebase sync
+      const migration2 = 'add_is_synced_columns';
+      const migration2Exists = await this.execute(
+        'SELECT * FROM migrations WHERE name = ?',
+        [migration2],
+      );
+      const hasMigration2 =
+        migration2Exists.rows?.length > 0 ||
+        migration2Exists.rows?._array?.length > 0;
+
+      if (!hasMigration2) {
+        // Add is_synced to stock_items
+        try {
+          await this.execute(
+            'ALTER TABLE stock_items ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Add is_synced to clients
+        try {
+          await this.execute(
+            'ALTER TABLE clients ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Add is_synced to invoices
+        try {
+          await this.execute(
+            'ALTER TABLE invoices ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Add is_synced to expenses
+        try {
+          await this.execute(
+            'ALTER TABLE expenses ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Add is_synced to ledger_entries
+        try {
+          await this.execute(
+            'ALTER TABLE ledger_entries ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Add items_in_pack to stock_items for pack-based inventory
+        try {
+          await this.execute(
+            'ALTER TABLE stock_items ADD COLUMN items_in_pack INTEGER DEFAULT NULL',
+          );
+        } catch (e) {
+          // Column might already exist
+        }
+
+        // Record the migration
+        await this.execute(
+          'INSERT INTO migrations (name, executed_at) VALUES (?, ?)',
+          [migration2, Date.now()],
+        );
+      }
     } catch (error) {
       throw error;
     }

@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useThemeStore } from '@/store/themeStore';
@@ -18,6 +19,13 @@ import { CategorySettings } from '@/types';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { showSuccessToast, showErrorToast } from '@/utils/toast';
 import { Database } from '@/database';
+import {
+  uploadToFirestore,
+  downloadFromFirestore,
+  fullSync,
+  getSyncStatus,
+  SyncProgress,
+} from '@/services/firebaseSync';
 
 // Available icons for categories
 const AVAILABLE_ICONS = [
@@ -98,6 +106,12 @@ export default function SettingsScreen({ navigation }: any) {
   const [categoryToDelete, setCategoryToDelete] =
     useState<CategorySettings | null>(null);
 
+  // Sync state
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     icon: 'package-variant',
@@ -107,7 +121,90 @@ export default function SettingsScreen({ navigation }: any) {
 
   useEffect(() => {
     loadCategories();
+    loadSyncStatus();
   }, []);
+
+  const loadSyncStatus = async () => {
+    try {
+      const status = await getSyncStatus();
+      setUnsyncedCount(status.unsyncedCount);
+      setLastSyncTime(status.lastSyncTime);
+    } catch (error) {
+      console.log('Error loading sync status:', error);
+    }
+  };
+
+  const handleUploadToCloud = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await uploadToFirestore(progress => {
+        setSyncProgress(progress);
+      });
+      if (result.success) {
+        showSuccessToast('Upload Complete', result.message);
+        await loadSyncStatus();
+      } else {
+        showErrorToast('Upload Failed', result.message);
+      }
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Upload failed');
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(null);
+    }
+  };
+
+  const handleDownloadFromCloud = async () => {
+    Alert.alert(
+      'Download Data',
+      'This will download all data from the cloud and merge with your local data. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Download',
+          onPress: async () => {
+            setIsSyncing(true);
+            try {
+              const result = await downloadFromFirestore(progress => {
+                setSyncProgress(progress);
+              });
+              if (result.success) {
+                showSuccessToast('Download Complete', result.message);
+                await loadSyncStatus();
+              } else {
+                showErrorToast('Download Failed', result.message);
+              }
+            } catch (error: any) {
+              showErrorToast('Error', error.message || 'Download failed');
+            } finally {
+              setIsSyncing(false);
+              setSyncProgress(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleFullSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await fullSync(progress => {
+        setSyncProgress(progress);
+      });
+      if (result.success) {
+        showSuccessToast('Sync Complete', result.message);
+        await loadSyncStatus();
+      } else {
+        showErrorToast('Sync Failed', result.message);
+      }
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Sync failed');
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(null);
+    }
+  };
 
   const handleSaveCategory = async () => {
     if (!formData.name.trim()) {
@@ -295,6 +392,177 @@ export default function SettingsScreen({ navigation }: any) {
                 thumbColor={isDark ? theme.primary : theme.textTertiary}
               />
             </View>
+          </View>
+        </View>
+
+        {/* Cloud Sync Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Cloud Sync
+          </Text>
+          <View
+            style={[
+              styles.settingCard,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            {/* Sync Status */}
+            <View
+              style={[
+                styles.syncStatusRow,
+                { borderBottomColor: theme.border },
+              ]}
+            >
+              <View style={styles.syncStatusItem}>
+                <Icon name="cloud-upload" size={20} color={theme.primary} />
+                <Text
+                  style={[
+                    styles.syncStatusLabel,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Unsynced
+                </Text>
+                <Text
+                  style={[
+                    styles.syncStatusValue,
+                    {
+                      color: unsyncedCount > 0 ? theme.warning : theme.success,
+                    },
+                  ]}
+                >
+                  {unsyncedCount} records
+                </Text>
+              </View>
+              <View style={styles.syncStatusItem}>
+                <Icon name="clock-outline" size={20} color={theme.primary} />
+                <Text
+                  style={[
+                    styles.syncStatusLabel,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Last Sync
+                </Text>
+                <Text style={[styles.syncStatusValue, { color: theme.text }]}>
+                  {lastSyncTime
+                    ? lastSyncTime.toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Never'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Sync Progress */}
+            {isSyncing && syncProgress && (
+              <View
+                style={[
+                  styles.syncProgressContainer,
+                  { backgroundColor: theme.primary + '10' },
+                ]}
+              >
+                <ActivityIndicator size="small" color={theme.primary} />
+                <View style={styles.syncProgressText}>
+                  <Text
+                    style={[styles.syncProgressTitle, { color: theme.text }]}
+                  >
+                    {syncProgress.status === 'uploading'
+                      ? 'Uploading...'
+                      : 'Downloading...'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.syncProgressMessage,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {syncProgress.message}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Upload Button */}
+            <TouchableOpacity
+              style={[styles.settingRow, { opacity: isSyncing ? 0.5 : 1 }]}
+              onPress={handleUploadToCloud}
+              disabled={isSyncing}
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="cloud-upload" size={24} color={theme.success} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>
+                    Upload to Cloud
+                  </Text>
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Backup local data to Firebase
+                  </Text>
+                </View>
+              </View>
+              <Icon
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Download Button */}
+            <TouchableOpacity
+              style={[styles.settingRow, { opacity: isSyncing ? 0.5 : 1 }]}
+              onPress={handleDownloadFromCloud}
+              disabled={isSyncing}
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="cloud-download" size={24} color={theme.primary} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>
+                    Download from Cloud
+                  </Text>
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Restore data on new device
+                  </Text>
+                </View>
+              </View>
+              <Icon
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Full Sync Button */}
+            <TouchableOpacity
+              style={[styles.settingRow, { opacity: isSyncing ? 0.5 : 1 }]}
+              onPress={handleFullSync}
+              disabled={isSyncing}
+            >
+              <View style={styles.settingLeft}>
+                <Icon name="cloud-sync" size={24} color={theme.warning} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: theme.text }]}>
+                    Full Sync
+                  </Text>
+                  <Text
+                    style={[styles.helperText, { color: theme.textSecondary }]}
+                  >
+                    Upload & download all data
+                  </Text>
+                </View>
+              </View>
+              <Icon
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -929,5 +1197,43 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  syncStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  syncStatusItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  syncStatusLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  syncStatusValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  syncProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    borderRadius: 8,
+    gap: 12,
+  },
+  syncProgressText: {
+    flex: 1,
+  },
+  syncProgressTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  syncProgressMessage: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
