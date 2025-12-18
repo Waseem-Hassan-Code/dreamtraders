@@ -75,10 +75,11 @@ export default function InvoiceCreateScreen({ navigation, route }: any) {
     }
 
     // Check if this is a pack/box item
-    const isPack =
+    const isPack = Boolean(
       (item.unit === 'box' || item.unit === 'pack') &&
-      item.itemsInPack &&
-      item.itemsInPack > 0;
+        item.itemsInPack &&
+        item.itemsInPack > 0,
+    );
 
     const newItem: SaleItem = {
       stockItemId: item.id,

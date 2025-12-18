@@ -271,55 +271,157 @@ export default function StockManagementScreen({ navigation }: any) {
 
   const renderStockItem = ({ item }: { item: StockItem }) => {
     const isLowStock = item.currentQuantity <= item.minStockLevel;
+    const isOutOfStock = item.currentQuantity <= 0;
+    const statusColor = isOutOfStock
+      ? theme.danger
+      : isLowStock
+      ? theme.warning
+      : theme.success;
+
+    // Calculate margin/profit per unit
+    const margin = item.salePrice - item.purchasePrice;
+    const marginPercent =
+      item.purchasePrice > 0
+        ? Math.round((margin / item.purchasePrice) * 100)
+        : 0;
+
+    // Format quantity display for pack items
+    const formatQuantity = () => {
+      if (
+        item.itemsInPack &&
+        item.itemsInPack > 0 &&
+        (item.unit === 'box' || item.unit === 'pack')
+      ) {
+        const fullPacks = Math.floor(item.currentQuantity);
+        const looseItems = Math.round(
+          (item.currentQuantity - fullPacks) * item.itemsInPack,
+        );
+        return { fullPacks, looseItems, hasLoose: looseItems > 0 };
+      }
+      return null;
+    };
+    const qtyFormat = formatQuantity();
+
     return (
       <TouchableOpacity
         style={[
           styles.stockCard,
-          { backgroundColor: theme.card, borderColor: theme.border },
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+            borderLeftColor: statusColor,
+            borderLeftWidth: 4,
+          },
         ]}
         onPress={() => handleEditItem(item)}
+        activeOpacity={0.7}
       >
         <View style={styles.stockHeader}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.stockName, { color: theme.text }]}>
               {item.name}
             </Text>
-            <Text style={[styles.stockSku, { color: theme.textTertiary }]}>
-              SKU: {item.sku}
-            </Text>
-            {item.description && (
-              <View style={styles.stockSizeRow}>
-                <Icon name="weight" size={14} color={theme.textTertiary} />
-                <Text style={[styles.stockSize, { color: theme.textTertiary }]}>
-                  {item.description}
+            <View style={styles.stockMetaRow}>
+              <View
+                style={[
+                  styles.skuBadge,
+                  { backgroundColor: theme.primary + '10' },
+                ]}
+              >
+                <Text style={[styles.skuBadgeText, { color: theme.primary }]}>
+                  {item.sku}
                 </Text>
               </View>
+              {item.itemsInPack && (
+                <View
+                  style={[
+                    styles.packBadge,
+                    { backgroundColor: theme.textTertiary + '15' },
+                  ]}
+                >
+                  <Icon
+                    name="package-variant"
+                    size={12}
+                    color={theme.textTertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.packBadgeText,
+                      { color: theme.textTertiary },
+                    ]}
+                  >
+                    {item.itemsInPack}/pack
+                  </Text>
+                </View>
+              )}
+            </View>
+            {item.description && (
+              <Text
+                style={[styles.stockDescription, { color: theme.textTertiary }]}
+                numberOfLines={1}
+              >
+                {item.description}
+              </Text>
             )}
           </View>
           <View style={styles.stockRightSection}>
-            <View
-              style={[
-                styles.stockBadge,
-                {
-                  backgroundColor: isLowStock
-                    ? theme.danger + '20'
-                    : theme.success + '20',
-                },
-              ]}
-            >
-              <Text
+            {/* Quantity display - show boxes + loose items for pack items */}
+            {qtyFormat ? (
+              <View style={styles.qtyBadgeContainer}>
+                <View
+                  style={[
+                    styles.stockBadge,
+                    { backgroundColor: statusColor + '15' },
+                  ]}
+                >
+                  <Icon name="package-variant" size={14} color={statusColor} />
+                  <Text style={[styles.stockBadgeText, { color: statusColor }]}>
+                    {qtyFormat.fullPacks} {item.unit}
+                  </Text>
+                </View>
+                {qtyFormat.hasLoose && (
+                  <View
+                    style={[
+                      styles.looseBadge,
+                      { backgroundColor: theme.warning + '15' },
+                    ]}
+                  >
+                    <Icon name="cube-outline" size={12} color={theme.warning} />
+                    <Text
+                      style={[styles.looseBadgeText, { color: theme.warning }]}
+                    >
+                      +{qtyFormat.looseItems} pcs
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View
                 style={[
-                  styles.stockBadgeText,
-                  { color: isLowStock ? theme.danger : theme.success },
+                  styles.stockBadge,
+                  { backgroundColor: statusColor + '15' },
                 ]}
               >
-                {item.currentQuantity} {item.unit}
-              </Text>
-            </View>
+                <Icon
+                  name={
+                    isOutOfStock
+                      ? 'package-variant-closed-remove'
+                      : isLowStock
+                      ? 'alert-circle-outline'
+                      : 'check-circle-outline'
+                  }
+                  size={14}
+                  color={statusColor}
+                />
+                <Text style={[styles.stockBadgeText, { color: statusColor }]}>
+                  {item.currentQuantity} {item.unit}
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               style={[
                 styles.addStockBtn,
-                { backgroundColor: theme.primary + '20' },
+                { backgroundColor: theme.primary + '15' },
               ]}
               onPress={e => {
                 e.stopPropagation();
@@ -334,43 +436,53 @@ export default function StockManagementScreen({ navigation }: any) {
           </View>
         </View>
 
+        <View
+          style={[styles.stockDivider, { backgroundColor: theme.border }]}
+        />
+
         <View style={styles.stockDetails}>
-          <View style={styles.priceRow}>
-            <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>
-              Purchase:
+          <View style={styles.priceItem}>
+            <Text style={[styles.priceLabel, { color: theme.textTertiary }]}>
+              Purchase
             </Text>
-            <Text style={[styles.priceValue, { color: theme.text }]}>
-              PKR {item.purchasePrice}
-            </Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>
-              Wholesale:
-            </Text>
-            <Text style={[styles.priceValue, { color: theme.text }]}>
-              PKR {item.discountablePrice}
+            <Text style={[styles.priceValue, { color: theme.textSecondary }]}>
+              PKR {item.purchasePrice.toLocaleString()}
             </Text>
           </View>
-          <View style={styles.priceRow}>
-            <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>
-              Retail:
+          <View style={styles.priceItem}>
+            <Text style={[styles.priceLabel, { color: theme.textTertiary }]}>
+              Wholesale
             </Text>
-            <Text style={[styles.priceValue, { color: theme.primary }]}>
-              PKR {item.salePrice}
+            <Text style={[styles.priceValue, { color: theme.text }]}>
+              PKR {item.discountablePrice.toLocaleString()}
+            </Text>
+          </View>
+          <View style={styles.priceItem}>
+            <Text style={[styles.priceLabel, { color: theme.textTertiary }]}>
+              Margin
+            </Text>
+            <Text style={[styles.priceValue, { color: theme.success }]}>
+              PKR {margin.toLocaleString()} ({marginPercent}%)
             </Text>
           </View>
         </View>
 
-        {isLowStock && (
+        {(isLowStock || isOutOfStock) && (
           <View
             style={[
               styles.lowStockAlert,
-              { backgroundColor: theme.danger + '15' },
+              { backgroundColor: statusColor + '10' },
             ]}
           >
-            <Icon name="alert" size={16} color={theme.danger} />
-            <Text style={[styles.lowStockText, { color: theme.danger }]}>
-              Low Stock! Min: {item.minStockLevel} {item.unit}
+            <Icon
+              name={isOutOfStock ? 'package-variant-closed-remove' : 'alert'}
+              size={16}
+              color={statusColor}
+            />
+            <Text style={[styles.lowStockText, { color: statusColor }]}>
+              {isOutOfStock
+                ? 'Out of Stock!'
+                : `Low Stock! Min: ${item.minStockLevel} ${item.unit}`}
             </Text>
           </View>
         )}
@@ -1304,31 +1416,86 @@ const styles = StyleSheet.create({
   categoryChipText: { fontSize: 13, fontWeight: '600', maxWidth: 80 },
   listContent: { padding: 16 },
   stockCard: {
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
     elevation: 2,
+    overflow: 'hidden',
   },
   stockHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
   },
-  stockName: { fontSize: 18, fontWeight: 'bold' },
-  stockSku: { fontSize: 12, marginTop: 2 },
-  stockSizeRow: {
+  stockName: { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  stockMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    gap: 8,
+    marginBottom: 4,
   },
-  stockSize: { fontSize: 12, marginLeft: 2 },
-  stockBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  stockBadgeText: { fontSize: 14, fontWeight: 'bold' },
-  stockDetails: { gap: 8 },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  priceLabel: { fontSize: 14 },
+  skuBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  skuBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  packBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  packBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  stockDescription: { fontSize: 12, marginTop: 2 },
+  stockRightSection: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  qtyBadgeContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  stockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 4,
+  },
+  stockBadgeText: { fontSize: 13, fontWeight: 'bold' },
+  looseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  looseBadgeText: { fontSize: 11, fontWeight: '600' },
+  stockDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  stockDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  priceItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  priceLabel: { fontSize: 11, textTransform: 'uppercase', marginBottom: 4 },
   priceValue: { fontSize: 14, fontWeight: '600' },
   lowStockAlert: {
     flexDirection: 'row',
@@ -1441,10 +1608,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  stockRightSection: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
   addStockBtn: {
     flexDirection: 'row',
     alignItems: 'center',

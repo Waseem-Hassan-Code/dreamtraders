@@ -242,27 +242,35 @@ export default function MonthlyEarningsScreen({ navigation }: any) {
                 <Text
                   style={[styles.profitLabel, { color: theme.textSecondary }]}
                 >
-                  Net Profit
+                  Gross Profit
                 </Text>
                 <Text
                   style={[
                     styles.profitValue,
                     {
-                      color: data.netProfit >= 0 ? theme.success : theme.danger,
+                      color:
+                        data.totalMargin >= 0 ? theme.success : theme.danger,
                     },
                   ]}
                 >
-                  PKR {data.netProfit.toLocaleString()}
+                  PKR {data.totalMargin.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.profitItem}>
                 <Text
                   style={[styles.profitLabel, { color: theme.textSecondary }]}
                 >
-                  Gross Margin
+                  Net (After Exp.)
                 </Text>
-                <Text style={[styles.profitValue, { color: theme.primary }]}>
-                  PKR {data.totalMargin.toLocaleString()}
+                <Text
+                  style={[
+                    styles.profitValue,
+                    {
+                      color: data.netProfit >= 0 ? theme.primary : theme.danger,
+                    },
+                  ]}
+                >
+                  PKR {(data.totalMargin - data.totalExpenses).toLocaleString()}
                 </Text>
               </View>
             </View>
@@ -353,15 +361,18 @@ export default function MonthlyEarningsScreen({ navigation }: any) {
               </Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Net Profit</Text>
+              <Text style={styles.summaryLabel}>Gross Profit</Text>
               <Text style={styles.summaryValue}>
-                PKR {yearlyTotals.netProfit.toLocaleString()}
+                PKR {yearlyTotals.totalMargin.toLocaleString()}
               </Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Gross Margin</Text>
+              <Text style={styles.summaryLabel}>Net Profit</Text>
               <Text style={styles.summaryValue}>
-                PKR {yearlyTotals.totalMargin.toLocaleString()}
+                PKR{' '}
+                {(
+                  yearlyTotals.totalMargin - yearlyTotals.totalExpenses
+                ).toLocaleString()}
               </Text>
             </View>
           </View>

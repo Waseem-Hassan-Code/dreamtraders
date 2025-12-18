@@ -59,23 +59,39 @@ export default function DashboardScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation]);
 
-  // Calculate monthly sales from invoices (current year)
+  // Calculate monthly sales and gross profit from invoices (current year)
+  const [monthlyGrossProfit, setMonthlyGrossProfit] = useState<number[]>([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ]);
+
   useEffect(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
 
     const monthSales = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan to Dec
+    const monthProfit = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Gross profit per month
 
     invoices.forEach(invoice => {
       const invoiceDate = new Date(invoice.createdAt);
       if (invoiceDate.getFullYear() === currentYear) {
         const month = invoiceDate.getMonth(); // 0 = January
         monthSales[month] += invoice.total;
+
+        // Calculate gross profit (margin) for this invoice
+        invoice.items.forEach(item => {
+          const stockItem = stockItems.find(s => s.id === item.stockItemId);
+          if (stockItem) {
+            const purchaseCost = stockItem.purchasePrice * item.quantity;
+            const saleValue = item.total;
+            monthProfit[month] += saleValue - purchaseCost;
+          }
+        });
       }
     });
 
     setMonthlySales(monthSales);
-  }, [invoices]);
+    setMonthlyGrossProfit(monthProfit);
+  }, [invoices, stockItems]);
 
   // Calculate monthly expenses (current year)
   useEffect(() => {
@@ -113,10 +129,13 @@ export default function DashboardScreen({ navigation }: any) {
     setExpensesByCategory(expenseData);
   }, [expenses]);
 
-  // Calculate net earnings (sales - expenses) per month
-  const monthlyEarnings = useMemo(() => {
-    return monthlySales.map((sale, index) => sale - monthlyExpenses[index]);
-  }, [monthlySales, monthlyExpenses]);
+  // Calculate net profit (gross profit - expenses) per month
+  // Net Profit = (Sale Price - Purchase Price) - Expenses
+  const monthlyNetProfit = useMemo(() => {
+    return monthlyGrossProfit.map(
+      (profit, index) => profit - monthlyExpenses[index],
+    );
+  }, [monthlyGrossProfit, monthlyExpenses]);
 
   // Calculate total margin from stock (sale price - purchase price)
   const totalMargin = useMemo(() => {
@@ -127,11 +146,16 @@ export default function DashboardScreen({ navigation }: any) {
     }, 0);
   }, [stockItems]);
 
-  // Calculate current month earnings
-  const currentMonthEarnings = useMemo(() => {
+  // Calculate current month's gross profit and net profit
+  const currentMonthGrossProfit = useMemo(() => {
     const currentMonth = new Date().getMonth();
-    return monthlyEarnings[currentMonth] || 0;
-  }, [monthlyEarnings]);
+    return monthlyGrossProfit[currentMonth] || 0;
+  }, [monthlyGrossProfit]);
+
+  const currentMonthNetProfit = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    return monthlyNetProfit[currentMonth] || 0;
+  }, [monthlyNetProfit]);
 
   const loadStockStats = async () => {
     try {
@@ -370,8 +394,8 @@ export default function DashboardScreen({ navigation }: any) {
         >
           <LinearGradient
             colors={[
-              currentMonthEarnings >= 0 ? theme.success : theme.danger,
-              currentMonthEarnings >= 0
+              currentMonthNetProfit >= 0 ? theme.success : theme.danger,
+              currentMonthNetProfit >= 0
                 ? theme.successGradientEnd || '#059669'
                 : theme.dangerGradientEnd || '#dc2626',
             ]}
@@ -409,16 +433,16 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
               <View style={styles.earningsDivider} />
               <View style={styles.earningsItem}>
-                <Text style={styles.earningsLabel}>Expenses</Text>
+                <Text style={styles.earningsLabel}>Gross Profit</Text>
                 <Text style={styles.earningsValue}>
-                  PKR {monthlyExpenses[new Date().getMonth()].toLocaleString()}
+                  PKR {currentMonthGrossProfit.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.earningsDivider} />
               <View style={styles.earningsItem}>
                 <Text style={styles.earningsLabel}>Net Profit</Text>
                 <Text style={[styles.earningsValue, styles.profitValue]}>
-                  PKR {currentMonthEarnings.toLocaleString()}
+                  PKR {currentMonthNetProfit.toLocaleString()}
                 </Text>
               </View>
             </View>

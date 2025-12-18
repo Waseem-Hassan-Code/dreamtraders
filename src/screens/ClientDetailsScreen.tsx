@@ -206,7 +206,7 @@ const LedgerCard = ({
             {amount.toLocaleString()}
           </Text>
         </View>
-        <View style={styles.balanceRow}>
+        <View style={styles.ledgerBalanceRow}>
           <Text
             style={[styles.balanceLabelText, { color: theme.textTertiary }]}
           >
@@ -663,41 +663,41 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
             onPress={() => navigation.goBack()}
             style={[styles.backButton, { backgroundColor: theme.background }]}
           >
-            <Icon name="arrow-left" size={22} color={theme.text} />
+            <Icon name="arrow-left" size={20} color={theme.text} />
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <View
-              style={[
-                styles.avatarLarge,
-                { backgroundColor: theme.primary + '20' },
-              ]}
+          <View
+            style={[
+              styles.avatarSmall,
+              { backgroundColor: theme.primary + '20' },
+            ]}
+          >
+            <Text style={[styles.avatarTextSmall, { color: theme.primary }]}>
+              {client.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={styles.headerInfo}>
+            <Text
+              style={[styles.headerTitle, { color: theme.text }]}
+              numberOfLines={1}
             >
-              <Text style={[styles.avatarText, { color: theme.primary }]}>
-                {client.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>
               {client.name}
             </Text>
             <Text
               style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+              numberOfLines={1}
             >
               {client.shopName}
             </Text>
           </View>
 
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              onPress={handleOpenEditModal}
-              style={[
-                styles.actionButton,
-                { backgroundColor: theme.background },
-              ]}
-            >
-              <Icon name="pencil" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={handleOpenEditModal}
+            style={[styles.actionButton, { backgroundColor: theme.background }]}
+          >
+            <Icon name="pencil" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Quick Action Buttons */}
@@ -709,7 +709,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
               { backgroundColor: theme.primary + '15' },
             ]}
           >
-            <Icon name="phone" size={20} color={theme.primary} />
+            <Icon name="phone" size={16} color={theme.primary} />
             <Text style={[styles.quickActionText, { color: theme.primary }]}>
               Call
             </Text>
@@ -730,7 +730,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
           >
             <Icon
               name="whatsapp"
-              size={20}
+              size={16}
               color={hasWhatsApp ? '#25D366' : theme.textTertiary}
             />
             <Text
@@ -752,7 +752,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
               { backgroundColor: theme.success + '15' },
             ]}
           >
-            <Icon name="receipt" size={20} color={theme.success} />
+            <Icon name="receipt" size={16} color={theme.success} />
             <Text style={[styles.quickActionText, { color: theme.success }]}>
               Invoice
             </Text>
@@ -760,7 +760,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         </View>
       </LinearGradient>
 
-      {/* Balance Card */}
+      {/* Compact Balance Card with Stats */}
       <Animated.View style={{ transform: [{ scale: cardScale }] }}>
         <LinearGradient
           colors={
@@ -770,90 +770,43 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.balanceCard, shadows.large]}
+          style={[styles.balanceCard, shadows.medium]}
         >
-          <View style={styles.balanceTop}>
-            <View style={styles.balanceIconContainer}>
-              <Icon
-                name={
-                  client.balance > 0 ? 'arrow-up-circle' : 'arrow-down-circle'
-                }
-                size={32}
-                color="rgba(255,255,255,0.9)"
-              />
-            </View>
-            <View style={styles.balanceInfo}>
-              <Text style={styles.balanceLabel}>Current Balance</Text>
-              <Text style={styles.balanceAmount}>
+          <View style={styles.balanceRow}>
+            <View style={styles.balanceLeft}>
+              <Text style={styles.balanceLabelCompact}>
+                {client.balance > 0 ? 'Due' : 'Credit'}
+              </Text>
+              <Text style={styles.balanceAmountCompact}>
                 PKR {Math.abs(client.balance).toLocaleString()}
               </Text>
-              <Text style={styles.balanceStatus}>
-                {client.balance > 0 ? 'Outstanding Due' : 'Credit Available'}
-              </Text>
             </View>
+            <View style={styles.statsInline}>
+              <View style={styles.statInline}>
+                <Text style={styles.statInlineNum}>{stats.salesCount}</Text>
+                <Text style={styles.statInlineLabel}>Sales</Text>
+              </View>
+              <View style={styles.statInline}>
+                <Text style={styles.statInlineNum}>{stats.paymentsCount}</Text>
+                <Text style={styles.statInlineLabel}>Paid</Text>
+              </View>
+              <View style={styles.statInline}>
+                <Text style={styles.statInlineNum}>
+                  {(stats.totalDebits / 1000).toFixed(0)}K
+                </Text>
+                <Text style={styles.statInlineLabel}>Total</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.paymentBtnCompact}
+              onPress={() => setShowPaymentModal(true)}
+              activeOpacity={0.8}
+            >
+              <Icon name="cash-plus" size={20} color={theme.success} />
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.receivePaymentBtn}
-            onPress={() => setShowPaymentModal(true)}
-            activeOpacity={0.8}
-          >
-            <Icon name="cash-plus" size={20} color={theme.success} />
-            <Text style={[styles.receivePaymentText, { color: theme.success }]}>
-              Receive Payment
-            </Text>
-          </TouchableOpacity>
         </LinearGradient>
       </Animated.View>
-
-      {/* Stats Row */}
-      <View style={styles.statsRow}>
-        <View
-          style={[
-            styles.statBox,
-            { backgroundColor: theme.card },
-            shadows.small,
-          ]}
-        >
-          <Icon name="cart-arrow-right" size={20} color={theme.primary} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>
-            {stats.salesCount}
-          </Text>
-          <Text style={[styles.statLabelText, { color: theme.textSecondary }]}>
-            Sales
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.statBox,
-            { backgroundColor: theme.card },
-            shadows.small,
-          ]}
-        >
-          <Icon name="cash-check" size={20} color={theme.success} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>
-            {stats.paymentsCount}
-          </Text>
-          <Text style={[styles.statLabelText, { color: theme.textSecondary }]}>
-            Payments
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.statBox,
-            { backgroundColor: theme.card },
-            shadows.small,
-          ]}
-        >
-          <Icon name="trending-up" size={20} color={theme.warning} />
-          <Text style={[styles.statNumber, { color: theme.text }]}>
-            {(stats.totalDebits / 1000).toFixed(0)}K
-          </Text>
-          <Text style={[styles.statLabelText, { color: theme.textSecondary }]}>
-            Total Sales
-          </Text>
-        </View>
-      </View>
 
       {/* Ledger Section */}
       <View style={styles.ledgerSection}>
@@ -861,7 +814,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
           <View style={styles.sectionTitleRow}>
             <Icon
               name="book-open-page-variant"
-              size={22}
+              size={18}
               color={theme.primary}
             />
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -869,7 +822,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
             </Text>
           </View>
           <Text style={[styles.entryCount, { color: theme.textTertiary }]}>
-            {displayedEntries.length} of {ledgerEntries.length} entries
+            {displayedEntries.length}/{ledgerEntries.length}
           </Text>
         </View>
 
@@ -1393,147 +1346,129 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerGradient: {
-    paddingTop: StatusBar.currentHeight || 44,
-    paddingBottom: 16,
+    paddingTop: StatusBar.currentHeight || 40,
+    paddingBottom: 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 8,
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
     marginHorizontal: 16,
   },
-  avatarLarge: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
+  avatarSmall: {
     width: 40,
     height: 40,
     borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  avatarTextSmall: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    gap: 12,
-    marginTop: 8,
+    gap: 8,
+    marginTop: 4,
+    paddingBottom: 8,
   },
   quickActionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 4,
   },
   quickActionText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   balanceCard: {
-    margin: 16,
-    borderRadius: 20,
-    padding: 20,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  balanceTop: {
+  balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  balanceIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  balanceInfo: {
+  balanceLeft: {
     flex: 1,
   },
-  balanceLabel: {
+  balanceLabelCompact: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  balanceAmount: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '800',
-    marginVertical: 2,
-  },
-  balanceStatus: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
   },
-  receivePaymentBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
+  balanceAmountCompact: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
   },
-  receivePaymentText: {
+  statsInline: {
+    flexDirection: 'row',
+    gap: 12,
+    marginRight: 12,
+  },
+  statInline: {
+    alignItems: 'center',
+  },
+  statInlineNum: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
-  statsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 16,
+  statInlineLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 9,
+    fontWeight: '500',
   },
-  statBox: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 14,
+  paymentBtnCompact: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  statLabelText: {
-    fontSize: 11,
-    marginTop: 2,
   },
   ledgerSection: {
     flex: 1,
@@ -1543,82 +1478,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
   },
   entryCount: {
-    fontSize: 12,
+    fontSize: 11,
   },
   ledgerList: {
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   ledgerCard: {
     flexDirection: 'row',
-    borderRadius: 14,
-    marginBottom: 10,
+    borderRadius: 12,
+    marginBottom: 8,
     borderWidth: 1,
     overflow: 'hidden',
   },
   ledgerDateColumn: {
-    width: 54,
-    paddingVertical: 14,
+    width: 48,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ledgerDay: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   ledgerMonth: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     textTransform: 'uppercase',
   },
   ledgerContent: {
     flex: 1,
-    padding: 12,
-    paddingLeft: 8,
+    padding: 10,
+    paddingLeft: 6,
   },
   ledgerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 2,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    gap: 3,
   },
   typeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   invoiceBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
   invoiceText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
   },
   ledgerDescription: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   itemsPreview: {
     flexDirection: 'row',
@@ -1652,7 +1587,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  balanceRow: {
+  ledgerBalanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,

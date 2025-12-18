@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ export default function ExpenseListScreen({ navigation }: any) {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
@@ -38,6 +39,32 @@ export default function ExpenseListScreen({ navigation }: any) {
     date: new Date(),
     notes: '',
   });
+
+  // Filter expenses based on search query
+  const filteredExpenses = useMemo(() => {
+    if (!searchQuery.trim()) return expenses;
+    const query = searchQuery.toLowerCase();
+    return expenses.filter(
+      exp =>
+        exp.description.toLowerCase().includes(query) ||
+        exp.category.name.toLowerCase().includes(query),
+    );
+  }, [expenses, searchQuery]);
+
+  // Calculate summary statistics - expenses only
+  const summary = useMemo(() => {
+    const today = new Date();
+    const thisMonth = expenses.filter(exp => {
+      const expDate = new Date(exp.date);
+      return (
+        expDate.getMonth() === today.getMonth() &&
+        expDate.getFullYear() === today.getFullYear()
+      );
+    });
+    const totalThisMonth = thisMonth.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalAll = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    return { totalThisMonth, totalAll, countThisMonth: thisMonth.length };
+  }, [expenses]);
 
   useEffect(() => {
     loadExpenses();
@@ -128,49 +155,98 @@ export default function ExpenseListScreen({ navigation }: any) {
   };
 
   const renderExpenseItem = ({ item }: { item: Expense }) => (
-    <View
+    <TouchableOpacity
       style={[
         styles.card,
-        { backgroundColor: theme.card, borderColor: theme.border },
+        {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+          borderLeftColor: item.category.color || theme.danger,
+          borderLeftWidth: 4,
+        },
       ]}
+      activeOpacity={0.7}
     >
-      <View style={styles.cardLeft}>
-        <View
-          style={[
-            styles.iconBox,
-            { backgroundColor: item.category.color + '20' },
-          ]}
-        >
-          <Icon
-            name={item.category.icon || 'cash'}
-            size={24}
-            color={item.category.color || theme.text}
-          />
+      <View style={styles.cardHeader}>
+        <View style={styles.cardLeft}>
+          <View
+            style={[
+              styles.iconBox,
+              { backgroundColor: (item.category.color || theme.danger) + '15' },
+            ]}
+          >
+            <Icon
+              name={item.category.icon || 'cash'}
+              size={22}
+              color={item.category.color || theme.danger}
+            />
+          </View>
+          <View style={styles.cardInfo}>
+            <Text
+              style={[styles.desc, { color: theme.text }]}
+              numberOfLines={1}
+            >
+              {item.description}
+            </Text>
+            <View style={styles.categoryRow}>
+              <View
+                style={[
+                  styles.categoryBadge,
+                  {
+                    backgroundColor:
+                      (item.category.color || theme.danger) + '15',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryBadgeText,
+                    { color: item.category.color || theme.danger },
+                  ]}
+                >
+                  {item.category.name}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
-        <View style={styles.cardInfo}>
-          <Text style={[styles.desc, { color: theme.text }]}>
-            {item.description}
+        <View style={styles.cardRight}>
+          <Text style={[styles.amount, { color: theme.danger }]}>
+            PKR {item.amount.toLocaleString()}
           </Text>
-          <Text style={[styles.category, { color: theme.textSecondary }]}>
-            {item.category.name}
-          </Text>
+          <TouchableOpacity
+            onPress={() => handleDelete(item)}
+            style={[styles.deleteBtn, { backgroundColor: theme.danger + '10' }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="trash-can-outline" size={18} color={theme.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+        <View style={styles.dateRow}>
+          <Icon name="calendar-outline" size={14} color={theme.textTertiary} />
           <Text style={[styles.date, { color: theme.textTertiary }]}>
             {formatDate(item.date)}
           </Text>
         </View>
+        {item.notes && (
+          <View style={styles.notesRow}>
+            <Icon
+              name="note-text-outline"
+              size={14}
+              color={theme.textTertiary}
+            />
+            <Text
+              style={[styles.notesText, { color: theme.textTertiary }]}
+              numberOfLines={1}
+            >
+              {item.notes}
+            </Text>
+          </View>
+        )}
       </View>
-      <View style={styles.cardRight}>
-        <Text style={[styles.amount, { color: theme.danger }]}>
-          - {item.amount.toLocaleString()}
-        </Text>
-        <TouchableOpacity
-          onPress={() => handleDelete(item)}
-          style={styles.deleteBtn}
-        >
-          <Icon name="trash-can-outline" size={20} color={theme.textTertiary} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -191,8 +267,73 @@ export default function ExpenseListScreen({ navigation }: any) {
         </Text>
       </View>
 
+      {/* Search Bar */}
+      <View
+        style={[styles.searchContainer, { backgroundColor: theme.surface }]}
+      >
+        <Icon name="magnify" size={20} color={theme.textSecondary} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Search expenses..."
+          placeholderTextColor={theme.textTertiary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Icon name="close-circle" size={18} color={theme.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Summary Card */}
+      <View style={styles.summaryContainer}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: theme.danger, borderRadius: 16 },
+          ]}
+        >
+          <View style={styles.summaryTop}>
+            <View style={styles.summaryIconBox}>
+              <Icon name="cash-minus" size={24} color="#fff" />
+            </View>
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryLabel}>This Month</Text>
+              <Text style={styles.summaryAmount}>
+                PKR {summary.totalThisMonth.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.summaryDivider,
+              { backgroundColor: 'rgba(255,255,255,0.2)' },
+            ]}
+          />
+          <View style={styles.summaryBottom}>
+            <View style={styles.summaryStatItem}>
+              <Text style={styles.summaryStatValue}>
+                {summary.countThisMonth}
+              </Text>
+              <Text style={styles.summaryStatLabel}>This Month</Text>
+            </View>
+            <View style={styles.summaryStatItem}>
+              <Text style={styles.summaryStatValue}>{expenses.length}</Text>
+              <Text style={styles.summaryStatLabel}>Total Records</Text>
+            </View>
+            <View style={styles.summaryStatItem}>
+              <Text style={styles.summaryStatValue}>
+                {(summary.totalAll / 1000).toFixed(1)}K
+              </Text>
+              <Text style={styles.summaryStatLabel}>All Time</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       <FlatList
-        data={expenses}
+        data={filteredExpenses}
         renderItem={renderExpenseItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
@@ -200,7 +341,9 @@ export default function ExpenseListScreen({ navigation }: any) {
           <View style={styles.emptyContainer}>
             <Icon name="cash-multiple" size={64} color={theme.textTertiary} />
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No expenses recorded
+              {searchQuery
+                ? 'No expenses match your search'
+                : 'No expenses recorded'}
             </Text>
           </View>
         }
@@ -378,7 +521,7 @@ export default function ExpenseListScreen({ navigation }: any) {
       <ConfirmDialog
         visible={deleteConfirm.visible}
         title="Delete Expense"
-        message={`Are you sure you want to delete this expense of ₹${
+        message={`Are you sure you want to delete this expense of PKR ${
           deleteConfirm.expense?.amount?.toLocaleString() || ''
         }?`}
         confirmText="Delete"
@@ -400,31 +543,142 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: { fontSize: 24, fontWeight: 'bold' },
-  listContent: { padding: 16 },
-  card: {
+  searchContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 16 },
+  summaryContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  summaryCard: {
     padding: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  summaryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  summaryInfo: {
+    flex: 1,
+  },
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  summaryAmount: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: 'bold',
+  },
+  summaryDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  summaryBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  summaryStatItem: {
+    alignItems: 'center',
+  },
+  summaryStatValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  summaryStatLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  listContent: { padding: 16, paddingTop: 8 },
+  card: {
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
-    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardInfo: { flex: 1 },
-  desc: { fontSize: 16, fontWeight: '600' },
-  category: { fontSize: 14, marginTop: 2 },
-  date: { fontSize: 12, marginTop: 2 },
+  desc: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
   cardRight: { alignItems: 'flex-end', gap: 8 },
   amount: { fontSize: 16, fontWeight: 'bold' },
-  deleteBtn: { padding: 4 },
+  deleteBtn: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  date: { fontSize: 12 },
+  notesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    marginLeft: 16,
+  },
+  notesText: {
+    fontSize: 12,
+    flex: 1,
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
